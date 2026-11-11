@@ -1,0 +1,50 @@
+version: "3.8"
+services:
+  xiaosa-ktv:
+    build: .
+    image: xiaosa-ktv:1.0.0
+    container_name: xiaosa-ktv
+    restart: unless-stopped
+    # 端口固定使用宿主机 8083，容器内部始终监听 8080。
+    ports:
+      - "8083:8080"
+    environment:
+      - TZ=Asia/Shanghai
+      - PORT=8080
+      - DATA_DIR=/data
+      - MV_DIR=/mv
+      - MV_DIR_NET=/mv-net
+      - SINGER_DIR=/singer
+      # 管理员密码：1.0.0 改成由部署方在这里定义，不再走"首次打开后台设置密码"。
+      # 请把这行改成你自己的密码；不设置时服务端会回退到默认 admin888 并打警告。
+      - ADMIN_PASSWORD=admin888
+      # VAAPI 渲染节点路径，容器内代码据此判断硬件加速是否可用；与下面
+      # devices 段落是否被安装脚本裁掉保持一致（宿主机没有核显/独显时，
+      # cmd/install_callback 会自动删掉 devices 段落，容器里检测不到这个
+      # 路径就会自动回退到 libx264 软件编码）。
+      - VAAPI_DEVICE=/dev/dri/renderD128
+      # HLS 缓存每日清理：距上次转码完成超过这个天数、且最近未被重新点唱的
+      # 缓存会被自动清理释放磁盘空间，源 MV 文件不受影响，下次点唱会自动
+      # 重新生成缓存。
+      - HLS_CACHE_MAX_AGE_DAYS=3
+    volumes:
+      # 1.0.0 固定使用应用默认共享目录下的四个子目录：
+      #   data    数据库/封面/缓存等应用数据
+      #   mv      本地曲库
+      #   mv-net  网络/网盘曲库（配合后台「曲库来源」使用）
+      #   singer  歌手头像（文件名=歌手名，如 周杰伦.jpg）
+      - /vol1/@appshare/xiaosa-ktv/data:/data
+      - /vol1/@appshare/xiaosa-ktv/mv:/mv
+      - /vol1/@appshare/xiaosa-ktv/mv-net:/mv-net
+      - /vol1/@appshare/xiaosa-ktv/singer:/singer
+    # VAAPI_DEVICES_BEGIN
+    # 直通宿主机的 DRI 渲染节点，供 ffmpeg 使用 h264_vaapi 做硬件编解码。
+    # 注意：如果宿主机没有 /dev/dri（纯软件环境/无核显的老机器），
+    # `docker compose up` 会因为设备不存在而直接报错退出，因此这整段
+    # (含 devices: 键) 是否保留在最终生效的 docker-compose.yml 里，由
+    # cmd/install_callback 在真实宿主机上安装/升级时动态探测决定：探测不到
+    # /dev/dri/renderD128 就会把这段一起删掉，保证没有硬件加速的机器上应用
+    # 依然能正常启动（仅走软件转码）。
+    devices:
+      - /dev/dri:/dev/dri
+    # VAAPI_DEVICES_END

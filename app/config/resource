@@ -1,0 +1,30 @@
+{
+    "docker-project":
+    {
+        "projects":
+        [
+            {
+                "name": "xiaosa-ktv",
+                "path": "docker"
+            }
+        ]
+    },
+    "data-share":
+    {
+        "shares":
+        [
+            {
+                "name": "xiaosa-ktv",
+                "permission":{"rw":["docker-xiaosa-ktv"]}
+            },
+            {
+                "name": "xiaosa-ktv/data",
+                "permission":{"rw":["docker-xiaosa-ktv"]}
+            },
+            {
+                "name": "xiaosa-ktv/mv",
+                "permission":{"rw":["docker-xiaosa-ktv"]}
+            }
+        ]
+    }
+}

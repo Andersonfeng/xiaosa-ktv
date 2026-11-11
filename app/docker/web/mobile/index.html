@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<script src="/shared/room.js"></script>
+<script>
+(function(){var t=null;try{t=localStorage.getItem('ktv-mobile-theme');}catch(e){}
+if(t!=='light'&&t!=='dark'){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';}
+document.documentElement.setAttribute('data-theme',t);})();
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="theme-color" content="#08081c" id="meta-theme-color">
+<title>潇洒K歌 · 点歌 & 遥控</title>
+<style>
+:root{
+  --bg:#08081c;--card:rgba(255,255,255,0.06);--modal:#10102a;--hdr:rgba(8,8,28,.9);
+  --accent:#c736f7;--accent2:#36d9f7;--pink:#ff4f9b;--orange:#ff8c42;
+  --text:#f4f4ff;--sub:#8888aa;--w03:rgba(255,255,255,.03);--w04:rgba(255,255,255,.04);--w05:rgba(255,255,255,.05);--w06:rgba(255,255,255,.06);--w07:rgba(255,255,255,.07);--w08:rgba(255,255,255,.08);--w09:rgba(255,255,255,.09);--w10:rgba(255,255,255,.1);--w12:rgba(255,255,255,.12);--w14:rgba(255,255,255,.14);--w15:rgba(255,255,255,.15);color-scheme:dark;
+}
+/* 白天主题：左上角按钮切换，选择保存在浏览器 localStorage */
+:root[data-theme="light"]{
+  --bg:#f2f3fa;--card:#ffffff;--modal:#ffffff;--hdr:rgba(255,255,255,.92);
+  --accent:#a21fd1;--accent2:#0a93bd;--pink:#d92d78;--orange:#c75a0a;
+  --text:#1b1b38;--sub:#65658a;--w03:rgba(30,30,80,.04);--w04:rgba(30,30,80,.05);--w05:rgba(30,30,80,.06);--w06:rgba(30,30,80,.07);--w07:rgba(30,30,80,.09);--w08:rgba(30,30,80,.11);--w09:rgba(30,30,80,.12);--w10:rgba(30,30,80,.14);--w12:rgba(30,30,80,.18);--w14:rgba(30,30,80,.22);--w15:rgba(30,30,80,.24);color-scheme:light;
+}
+:root[data-theme="light"] body{background:radial-gradient(circle at 15% 0%,rgba(199,54,247,.10),transparent 45%),radial-gradient(circle at 85% 30%,rgba(54,169,247,.10),transparent 45%),var(--bg)}
+.theme-chip{position:absolute;left:0;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer;user-select:none;
+  background:var(--w08);border:1px solid var(--w14);color:var(--text)}
+.theme-chip:active{background:rgba(199,54,247,.3);border-color:var(--accent)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;min-height:100vh;
+  background:radial-gradient(circle at 15% 0%,rgba(199,54,247,.18),transparent 45%),
+             radial-gradient(circle at 85% 30%,rgba(54,169,247,.15),transparent 45%),var(--bg);
+  color:var(--text);font-family:"PingFang SC","Microsoft YaHei",sans-serif;
+  padding-bottom:80px}
+
+/* ===== HEADER ===== */
+header{
+  position:sticky;top:0;z-index:10;
+  background:var(--hdr);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--w07);padding:12px 16px 0}
+/* 顶部标题栏：只保留居中标题，不再放搜索/刷新图标 */
+.topbar{display:flex;align-items:center;justify-content:center;position:relative}
+.room-chip{position:absolute;right:0;top:50%;transform:translateY(-50%);max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:12px;padding:5px 10px;border-radius:999px;color:var(--text);cursor:pointer;background:var(--w08);border:1px solid var(--w14)}
+.room-chip:active{background:rgba(199,54,247,.3);border-color:var(--accent)}
+#room-pick-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:300;background:rgba(0,0,0,.6);align-items:center;justify-content:center;padding:20px}
+#room-pick-overlay.open{display:flex}
+#room-pick{width:100%;max-width:380px;max-height:80vh;overflow-y:auto;background:var(--modal);border:1px solid rgba(199,54,247,.4);border-radius:18px;padding:18px}
+#room-pick h3{font-size:16px;margin-bottom:6px}
+#room-pick .rp-sub{font-size:12px;color:var(--sub);margin-bottom:12px;line-height:1.5}
+.rp-item{display:flex;align-items:center;gap:8px;padding:12px;border-radius:12px;margin-bottom:8px;cursor:pointer;background:var(--w06);border:1px solid var(--w10)}
+.rp-item.cur{border-color:var(--accent);background:rgba(199,54,247,.18)}
+.rp-item .rp-n{flex:1;font-size:14px;font-weight:600}
+.rp-item .rp-m{font-size:11px;color:var(--sub)}
+.rp-close{margin-top:6px;width:100%;padding:10px;border:none;border-radius:10px;color:var(--text);background:var(--w10);font-size:14px}
+.brand{font-size:17px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 常驻播放控制行：改成一行显示，不允许换行；曲库搜索/遥控/队列各 tab 切换时
+   都保持可见，不再收在"遥控"tab 里，也不需要额外的卡片背景/标题包裹。 */
+.ctrl-row.main-row{display:flex;flex-wrap:nowrap;gap:8px;margin-top:12px}
+.ctrl-row.main-row .ctrl-btn{min-width:0;max-width:none;flex:1 1 0;padding:9px 2px}
+.ctrl-row.main-row .ci svg{width:19px;height:19px}
+.ctrl-row.main-row .cl{font-size:10.5px;white-space:nowrap}
+/* Tab bar */
+.tabs{display:flex;margin-top:10px;gap:4px}
+.tab{
+  flex:1;text-align:center;padding:10px 0;font-size:13px;
+  color:var(--sub);border-bottom:2px solid transparent;transition:.2s
+}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.tab svg{width:15px;height:15px;vertical-align:-3px;margin-right:3px}
+
+/* ===== SEARCH BOX（常驻，不再局限于"点歌"tab，切到"队列"/"遥控"也能直接点歌） ===== */
+.search-box{
+  margin:12px 0 0;display:flex;align-items:center;gap:8px;
+  background:var(--w07);border-radius:14px;padding:11px 14px;
+  border:1px solid var(--w08)}
+.search-box input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:15px}
+.search-box svg{width:18px;height:18px;flex-shrink:0}
+.nickname-row{margin:10px 0 2px}
+.nickname-row input{
+  width:100%;background:var(--w04);border:1px solid var(--w08);
+  border-radius:12px;padding:9px 14px;color:var(--text);font-size:13px;outline:none}
+#song-list{padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.song-card{
+  display:flex;align-items:center;background:var(--card);
+  border:1px solid var(--w06);padding:13px 14px;border-radius:16px;gap:12px}
+.song-card .info{flex:1}
+.song-card .title{font-size:15px;font-weight:600}
+.song-card .artist{font-size:12px;color:var(--sub);margin-top:3px}
+.btn-add{
+  width:38px;height:38px;border-radius:50%;border:none;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.btn-fav{
+  width:34px;height:34px;border-radius:50%;border:1px solid var(--w15);
+  background:var(--w06);font-size:16px;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;color:var(--sub)}
+.btn-fav.faved{background:rgba(255,79,155,.25);border-color:var(--pink);color:var(--pink)}
+#empty{text-align:center;color:var(--sub);padding:40px 0;font-size:14px}
+/* 分页：点歌列表默认(未输入搜索词时)以前是一次性把整个曲库拉下来，曲库一大
+   (几千~上万首)首屏就要等很久、還很占内存。改成跟服务端 /api/songs 的分页
+   参数(page/pageSize)配合，每页只拉 20 首，输入搜索词时同样按分页请求。 */
+#song-pager{display:flex;align-items:center;justify-content:center;gap:14px;padding:6px 16px 4px;color:var(--sub);font-size:13px}
+#song-pager button{
+  border:1px solid var(--w12);background:var(--w06);color:var(--text);
+  border-radius:10px;padding:7px 16px;font-size:13px;display:flex;align-items:center;gap:4px}
+#song-pager button:disabled{opacity:.35}
+#song-pager button svg{width:14px;height:14px}
+
+/* ===== QUEUE TAB ===== */
+#tab-queue{padding:14px 16px}
+.q-row{
+  display:flex;align-items:center;padding:13px 14px;border-radius:14px;
+  background:var(--card);margin-bottom:10px;gap:10px;border:1px solid var(--w05)}
+.q-row.playing{border-color:var(--accent);background:rgba(199,54,247,.12)}
+.q-num{font-size:12px;color:var(--sub);width:22px;text-align:center}
+.q-info{flex:1}
+.q-title{font-size:14px;font-weight:600}
+.q-meta{font-size:11px;color:var(--sub);margin-top:3px}
+.q-acts{display:flex;gap:6px}
+.q-act{
+  padding:5px 10px;border-radius:8px;font-size:11px;border:none;
+  background:var(--w08);color:var(--text)}
+.q-act.top{background:rgba(124,44,247,.5)}
+.q-act.del{background:rgba(255,79,155,.2);color:var(--pink)}
+
+/* ===== REMOTE TAB ===== */
+#tab-remote{padding:20px 16px;display:flex;flex-direction:column;gap:16px}
+#tab-danmaku{padding:20px 16px}
+
+/* Now playing bar */
+#now-bar{
+  background:rgba(199,54,247,.12);border:1px solid rgba(199,54,247,.3);
+  border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px}
+#now-bar .nb-info{flex:1}
+#now-bar .nb-title{font-size:14px;font-weight:700}
+#now-bar .nb-meta{font-size:11px;color:var(--sub);margin-top:2px}
+#now-bar .nb-status{font-size:11px;color:var(--accent)}
+/* 需求(多终端播放进度同步)：手机遥控端本来就没有 <video> 在播放，天然
+   就是"控制端"，这里加一条只读进度条，展示服务端广播过来的播放端进度
+   (见 JS 里的 progress 消息处理 + 本地插值)，让人在手机上也能看到"唱到
+   哪了"，但不提供拖动交互——真要拖进度条去 TV 大屏上操作，手机上加一个
+   只读展示已经够用，没必要在这么小的屏幕上做精确拖拽。*/
+#now-bar{flex-wrap:wrap}
+#nb-prog-wrap{width:100%;order:3;margin-top:2px}
+#nb-prog-bar{width:100%;height:3px;background:var(--w15);border-radius:2px}
+#nb-prog-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--pink));border-radius:2px;width:0}
+#nb-prog-time{display:flex;justify-content:space-between;font-size:10px;color:var(--sub);margin-top:3px}
+
+/* Playback control row */
+.ctrl-section{background:var(--w04);border-radius:18px;padding:16px}
+.ctrl-title{font-size:12px;color:var(--sub);letter-spacing:1px;margin-bottom:14px}
+.ctrl-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.ctrl-btn{
+  flex:1;min-width:70px;max-width:90px;
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  padding:12px 8px;border-radius:14px;cursor:pointer;
+  background:var(--w07);border:1px solid var(--w10);
+  transition:.15s;user-select:none}
+.ctrl-btn:active{transform:scale(.93);background:rgba(199,54,247,.25);border-color:var(--accent)}
+.ctrl-btn .ci{font-size:22px;display:flex}
+.ctrl-btn .ci svg{width:22px;height:22px}
+.ctrl-btn .cl{font-size:11px;color:var(--sub)}
+
+/* 气氛弹幕 */
+.dm-emoji-row{display:flex;gap:8px;margin-bottom:12px}
+.dm-emoji-btn{flex:1;min-width:0;padding:10px 0 8px;border-radius:14px;text-align:center;cursor:pointer;user-select:none;
+  background:var(--w07);border:1px solid var(--w10);transition:.12s}
+.dm-emoji-btn .dm-e{display:block;font-size:26px;line-height:1.2}
+.dm-emoji-btn .dm-l{display:block;font-size:12px;margin-top:3px;color:var(--sub)}
+.dm-emoji-btn:active{transform:scale(.88);background:rgba(199,54,247,.25);border-color:var(--accent)}
+.dm-rain-btn{width:100%;padding:13px;border-radius:14px;text-align:center;font-weight:800;font-size:16px;letter-spacing:2px;cursor:pointer;user-select:none;
+  color:#07071a;background:linear-gradient(135deg,var(--pink),var(--accent),var(--accent2));margin-bottom:12px}
+.dm-rain-btn:active{transform:scale(.97);opacity:.85}
+.dm-chips{display:flex;flex-wrap:wrap;gap:8px;max-height:210px;overflow-y:auto;margin-bottom:12px}
+.dm-chip{font-size:13px;padding:7px 12px;border-radius:999px;cursor:pointer;user-select:none;color:var(--text);
+  background:var(--w07);border:1px solid var(--w14)}
+.dm-chip:active{background:rgba(199,54,247,.3);border-color:var(--accent)}
+.dm-custom{display:flex;gap:8px}
+.dm-custom input{flex:1;min-width:0;background:var(--w06);border:1px solid var(--w10);
+  border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;outline:none}
+.dm-custom button{padding:0 18px;border:none;border-radius:10px;font-weight:700;color:#07071a;background:linear-gradient(135deg,var(--accent),var(--accent2));cursor:pointer}
+#now-bar .nb-icon{flex-shrink:0;display:flex}
+#now-bar .nb-icon svg{width:26px;height:26px}
+.dpad-btn svg{width:22px;height:22px}
+.ctrl-btn.red .cl{color:var(--pink)}
+.ctrl-btn.red:active{background:rgba(255,79,155,.25);border-color:var(--pink)}
+.ctrl-btn.cyan .cl{color:var(--accent2)}
+.ctrl-btn.cyan:active{background:rgba(54,217,247,.2);border-color:var(--accent2)}
+.ctrl-btn.purple{background:rgba(199,54,247,.15);border-color:rgba(199,54,247,.35)}
+.ctrl-btn.purple .cl{color:var(--accent)}
+/* 原/伴唱按钮的"焦点"高亮：与 TV 端 .act 高亮样式保持一致的视觉语言，
+   当前处于伴唱模式时用更深的紫色底+紫色边框，与原唱模式(普通 cyan 底色)
+   区分开，按钮文案本身仍固定为"原/伴唱"不做文字切换，靠这层高亮区分状态。 */
+.ctrl-btn.voice-active{background:rgba(199,54,247,.38);border-color:var(--accent)}
+.ctrl-btn.voice-active .cl{color:var(--accent2)}
+/* 字幕按钮：显示时用青色高亮，当前歌曲没有字幕时降低透明度 */
+.ctrl-btn.subtitle-active{background:rgba(54,217,247,.25);border-color:var(--accent2)}
+.ctrl-btn.subtitle-active .cl{color:var(--accent2)}
+.ctrl-btn.disabled{opacity:.45}
+
+/* D-pad */
+.dpad{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  grid-template-rows:1fr 1fr 1fr;gap:8px;max-width:220px;margin:0 auto}
+.dpad-btn{
+  display:flex;align-items:center;justify-content:center;
+  height:64px;border-radius:14px;font-size:22px;
+  background:var(--w07);border:1px solid var(--w10);
+  cursor:pointer;transition:.15s}
+.dpad-btn:active{transform:scale(.9);background:rgba(54,217,247,.2);border-color:var(--accent2)}
+.dpad-ok{
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  font-size:15px;font-weight:700;border:none}
+.dpad-empty{background:transparent;border:none;pointer-events:none}
+
+/* ===== FAB queue ===== */
+#queue-fab{
+  position:fixed;right:16px;bottom:16px;z-index:20;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#000;font-weight:700;padding:13px 18px;border-radius:999px;
+  font-size:13px;display:flex;align-items:center;gap:8px;
+  box-shadow:0 8px 24px rgba(199,54,247,.4)
+}
+.fab-badge{background:rgba(0,0,0,.3);border-radius:999px;padding:1px 7px;font-size:12px}
+
+/* ===== TOAST ===== */
+#toast{
+  position:fixed;left:50%;top:16px;transform:translateX(-50%) translateY(-70px);
+  background:#fff;color:#111;padding:9px 18px;border-radius:12px;
+  font-size:13px;z-index:50;transition:.25s;box-shadow:0 10px 30px rgba(0,0,0,.25)
+}
+#toast.show{transform:translateX(-50%) translateY(0)}
+
+/* ===== 点歌入口 HUB（歌名/歌手/分类/热歌/最近/收藏/最新入库，跟 TV 端同一套
+   接口+交互逻辑，只是改成移动端更顺手的卡片网格，不用一次性把整个曲库摊开）
+   ===== */
+#song-hub{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 16px 4px}
+.hub-card{
+  display:flex;align-items:center;gap:10px;background:var(--card);
+  border:1px solid var(--w07);border-radius:16px;padding:14px 12px}
+.hub-card .hi{font-size:22px;flex-shrink:0}
+.hub-card .hl{font-size:14px;font-weight:600}
+.hub-card .hs{font-size:11px;color:var(--sub);margin-top:2px}
+
+/* 全屏二级面板：跟 TV 端 .pd-full 是同一套「面板承载子页面」的思路，铺满
+   整个视口、从右侧滑入，返回按钮回到 HUB / 上一级 */
+.mfull{
+  position:fixed;inset:0;z-index:40;background:var(--bg);
+  transform:translateX(100%);transition:transform .25s ease;
+  display:flex;flex-direction:column;overflow:hidden}
+.mfull.open{transform:translateX(0)}
+.mfull-head{
+  display:flex;align-items:center;gap:10px;padding:14px 16px;
+  border-bottom:1px solid var(--w07);flex-shrink:0;
+  background:var(--hdr);backdrop-filter:blur(16px)}
+.mfull-back{
+  font-size:13px;color:var(--sub);padding:6px 12px;border-radius:10px;
+  background:var(--w06);border:1px solid var(--w08);flex-shrink:0}
+.mfull-title{font-size:16px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mfull-body{flex:1;overflow-y:auto;padding:12px 16px 24px}
+
+/* 字母/数字虚拟键盘：跟 TV 端 handleAlpha() 同一套累积输入+拼音首字母匹配
+   逻辑，按钮排布改成移动端更紧凑的网格 */
+.alpha-disp{
+  display:flex;align-items:center;gap:8px;background:var(--w06);
+  border:1px solid var(--w08);border-radius:12px;padding:9px 12px;margin-bottom:10px}
+.alpha-disp .ad-txt{flex:1;font-size:13px;color:var(--text)}
+.ak-toggle{
+  border:1px solid var(--w15);background:var(--w07);
+  color:var(--text);border-radius:8px;padding:5px 10px;font-size:11px;flex-shrink:0}
+.alpha-keys{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:12px}
+.ak{
+  height:38px;display:flex;align-items:center;justify-content:center;
+  border-radius:9px;background:var(--w06);border:1px solid var(--w08);
+  font-size:13px;color:var(--text)}
+.ak:active{background:rgba(199,54,247,.3);border-color:var(--accent)}
+.ak-clr{grid-column:span 2;color:var(--pink);font-size:12px}
+
+/* 分类点歌：语种/风格 chip，跟 TV 端 selectCategory()/clearCategoryDim() 同一套
+   单选+"全部"清空逻辑 */
+.cat-group-title{font-size:12px;color:var(--sub);margin:10px 0 8px}
+.cat-chip-list{display:flex;flex-wrap:wrap;gap:8px}
+.cat-chip{
+  padding:7px 13px;border-radius:999px;background:var(--w06);
+  border:1px solid var(--w09);font-size:13px;color:var(--sub);display:flex;align-items:center;gap:5px}
+.cat-chip .cnt{font-size:10px;color:var(--sub);opacity:.7}
+.cat-chip.sel{background:rgba(199,54,247,.28);border-color:var(--accent);color:var(--text)}
+.cat-empty-tip{font-size:12px;color:var(--sub)}
+
+/* 歌手点歌：头像网格，跟 TV 端 renderArtists() 同一套「首字+纯色底」兜底 */
+.ag-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.ag-card{display:flex;flex-direction:column;align-items:center;gap:6px}
+.ag-av{
+  width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:22px;font-weight:700;color:#fff;object-fit:cover}
+.ag-name{font-size:12px;text-align:center;max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ag-cnt{font-size:10px;color:var(--sub)}
+
+/* 热歌排行 / 最新入库：排行/序号行 */
+.chart-row{
+  display:flex;align-items:center;gap:12px;background:var(--card);
+  border:1px solid var(--w06);border-radius:14px;padding:12px 14px;margin-bottom:9px}
+.chart-row .ck{font-size:14px;color:var(--sub);width:26px;text-align:center;flex-shrink:0}
+.chart-row .ck.r1{color:#ffd700}.chart-row .ck.r2{color:#c0c0c0}.chart-row .ck.r3{color:#cd7f32}
+.chart-row .chart-info{flex:1;overflow:hidden}
+.chart-row .ct{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chart-row .cm{font-size:11px;color:var(--sub);margin-top:3px}
+.chart-row .cp{font-size:10px;color:var(--sub);flex-shrink:0;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* 通用分页条（歌名点歌/歌手作品/分类/常唱/收藏/最新入库共用） */
+.pager{display:flex;align-items:center;justify-content:center;gap:14px;padding:10px 0 4px;color:var(--sub);font-size:13px}
+.pager button{
+  border:1px solid var(--w12);background:var(--w06);color:var(--text);
+  border-radius:10px;padding:7px 16px;font-size:13px}
+.pager button:disabled{opacity:.35}
+.mfull-empty{text-align:center;color:var(--sub);padding:40px 0;font-size:14px}
+</style>
+</head>
+<body>
+<header>
+  <div class="topbar">
+    <div class="theme-chip" id="theme-chip" onclick="toggleTheme()" title="切换白天/夜间主题">🌙</div>
+    <div class="brand"><img src="/shared/logo-sm.png" alt="潇洒K歌 · 点歌 &amp; 遥控" style="height:26px;width:auto;vertical-align:middle"></div>
+    <div class="room-chip" onclick="openRoomPicker()" title="切换房间">🏠 <span data-room-name>默认房间</span> ▾</div>
+  </div>
+
+  <!-- 常驻播放控制：一行显示，切换"点歌/队列/遥控"任意 tab 都不会隐藏 -->
+  <div class="ctrl-row main-row">
+    <div class="ctrl-btn purple" onclick="sendCtrl('play_pause')">
+      <span class="ci" id="r-play-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="14" y1="8" x2="14" y2="16"/></svg></span><span class="cl" id="r-play-label">暂停</span>
+    </div>
+    <div class="ctrl-btn cyan" id="r-voice-btn" onclick="sendCtrl('voice')">
+      <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span><span class="cl" id="r-voice-label">原唱</span>
+    </div>
+    <div class="ctrl-btn cyan" id="r-subtitle-btn" onclick="sendCtrl('subtitle')">
+      <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><text x="12" y="15.5" text-anchor="middle" font-size="7" fill="currentColor" stroke="none">CC</text></svg></span><span class="cl" id="r-subtitle-label">字幕开</span>
+    </div>
+    <div class="ctrl-btn" id="r-swap-btn" onclick="swapAudio()" title="这首歌的原唱/伴唱音轨是反的？点一下互换，永久保存，再点还原">
+      <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span><span class="cl">原伴互换</span>
+    </div>
+    <div class="ctrl-btn" onclick="sendCtrl('repeat')">
+      <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span><span class="cl">重唱</span>
+    </div>
+    <div class="ctrl-btn red" onclick="sendCtrl('next')">
+      <span class="ci"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 4 15 12 5 20 5 4"/><rect x="17" y="4" width="2" height="16"/></svg></span><span class="cl">切歌</span>
+    </div>
+  </div>
+
+  <!-- 常驻搜索框：不再收在"点歌"tab 里，切到"队列"/"遥控"页面也一直显示，
+       可以随时加歌不用先切回"点歌"tab -->
+  <div class="search-box">
+    <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+    <input id="search-input" placeholder="搜索歌名 / 歌手">
+  </div>
+  <div class="nickname-row">
+    <input id="nickname-input" placeholder="点歌昵称（可选）">
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('search',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>点歌</div>
+    <div class="tab" onclick="switchTab('queue',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>队列</div>
+    <div class="tab" onclick="switchTab('remote',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><line x1="10" y1="6" x2="14" y2="6"/><circle cx="12" cy="11" r="1.6" fill="currentColor" stroke="none"/><line x1="9" y1="16" x2="9" y2="16.01"/><line x1="12" y1="16" x2="12" y2="16.01"/><line x1="15" y1="16" x2="15" y2="16.01"/></svg>遥控</div>
+    <div class="tab" onclick="switchTab('danmaku',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>弹幕</div>
+  </div>
+</header>
+
+<!-- ====== SEARCH TAB：搜索框有内容时显示搜索结果，没内容时显示点歌入口 HUB
+     （歌名点歌/歌手点歌/分类点歌/热歌排行/最近唱过/我的收藏/最新入库，
+     跟 TV 端轮播卡的 8 个功能同一套后端接口+交互逻辑） ====== -->
+<div id="tab-search">
+  <div id="song-hub">
+    <div class="hub-card" onclick="openOrder()"><span class="hi">🎵</span><div><div class="hl">歌名点歌</div><div class="hs">按歌名浏览曲库</div></div></div>
+    <div class="hub-card" onclick="openArtists()"><span class="hi">🎤</span><div><div class="hl">歌手点歌</div><div class="hs">按歌手找歌</div></div></div>
+    <div class="hub-card" onclick="openCategory()"><span class="hi">🗂</span><div><div class="hl">分类点歌</div><div class="hs">语种 / 风格</div></div></div>
+    <div class="hub-card" onclick="openCharts()"><span class="hi">🏆</span><div><div class="hl">热歌排行</div><div class="hs">大家爱唱的歌</div></div></div>
+    <div class="hub-card" onclick="openHistory()"><span class="hi">⭐</span><div><div class="hl">最近唱过</div><div class="hs">常唱歌曲</div></div></div>
+    <div class="hub-card" onclick="openFavorites()"><span class="hi">❤️</span><div><div class="hl">我的收藏</div><div class="hs">已收藏歌曲</div></div></div>
+    <div class="hub-card" onclick="openNewest()"><span class="hi">🆕</span><div><div class="hl">最新入库</div><div class="hs">最近新增的歌</div></div></div>
+  </div>
+  <div id="song-list" style="display:none"></div>
+  <div id="empty" style="display:none">没有找到相关歌曲</div>
+  <div id="song-pager" style="display:none">
+    <button id="song-prev" onclick="songPage(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>上一页</button>
+    <span id="song-pg-info">1/1</span>
+    <button id="song-next" onclick="songPage(1)">下一页<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+  </div>
+</div>
+
+<!-- ====== 歌名点歌 ====== -->
+<div class="mfull" id="page-order">
+  <div class="mfull-head"><div class="mfull-back" onclick="closeMPage('page-order')">‹ 返回</div><div class="mfull-title">🎵 歌名点歌</div></div>
+  <div class="mfull-body">
+    <div id="od-alpha"></div>
+    <div id="order-list"></div>
+    <div class="pager" id="order-pager">
+      <button onclick="orderPage(-1)" id="order-prev">上一页</button>
+      <span id="order-pg-info">1/1</span>
+      <button onclick="orderPage(1)" id="order-next">下一页</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 歌手点歌 ====== -->
+<div class="mfull" id="page-artists">
+  <div class="mfull-head"><div class="mfull-back" onclick="closeMPage('page-artists')">‹ 返回</div><div class="mfull-title">🎤 歌手点歌</div></div>
+  <div class="mfull-body">
+    <div id="ar-alpha"></div>
+    <div class="ag-grid" id="artist-grid"></div>
+    <div class="pager" id="artist-pager">
+      <button onclick="artistPage(-1)" id="artist-prev">上一页</button>
+      <span id="artist-pg-info">1/1</span>
+      <button onclick="artistPage(1)" id="artist-next">下一页</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 歌手作品（歌手点歌二级） ====== -->
+<div class="mfull" id="page-artist-songs" style="z-index:41">
+  <div class="mfull-head"><div class="mfull-back" onclick="closeArtistSongs()">‹ 返回</div><div class="mfull-title" id="as-title">歌手作品</div></div>
+  <div class="mfull-body">
+    <div id="as-list"></div>
+    <div class="pager" id="as-pager">
+      <button onclick="artistSongsPage(-1)" id="as-prev">上一页</button>
+      <span id="as-pg-info">1/1</span>
+      <button onclick="artistSongsPage(1)" id="as-next">下一页</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 分类点歌 ====== -->
+<div class="mfull" id="page-category">
+  <div class="mfull-head"><div class="mfull-back" onclick="closeMPage('page-category')">‹ 返回</div><div class="mfull-title">🗂 分类点歌</div></div>
+  <div class="mfull-body">
+    <div class="cat-group-title">语种</div>
+    <div class="cat-chip-list" id="cat-lang-list"></div>
+    <div class="cat-group-title">风格</div>
+    <div class="cat-chip-list" id="cat-genre-list"></div>
+    <div id="category-list" style="margin-top:14px"></div>
+    <div class="pager" id="category-pager">
+      <button onclick="categoryPage(-1)" id="category-prev">上一页</button>
+      <span id="category-pg-info">—</span>
+      <button onclick="categoryPage(1)" id="category-next">下一页</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 热歌排行 ====== -->
+<div class="mfull" id="page-charts">
+  <div class="mfull-head"><div class="mfull-back" onclick="closeMPage('page-charts')">‹ 返回</div><div class="mfull-title">🏆 热歌排行</div></div>
+  <div class="mfull-body"><div id="charts-list"></div></div>
+</div>
+
+<!-- ====== 最近唱过 ====== -->
+<div class="mfull" id="page-history">
+  <div class="mfull-head"><div class="mfull-back" onclick="closeMPage('page-history')">‹ 返回</div><div class="mfull-title">⭐ 最近唱过</div></div>
+  <div class="mfull-body">
+    <div id="hs-alpha"></div>
+    <div id="history-list"></div>
+    <div class="pager" id="history-pager">
+      <button onclick="histPage(-1)" id="history-prev">上一页</button>
+      <span id="history-pg-info">1/1</span>
+      <button onclick="histPage(1)" id="history-next">下一页</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 我的收藏 ====== -->
+<div class="mfull" id="page-favorites">
+  <div class="mfull-head"><div class="mfull-back" onclick="closeMPage('page-favorites')">‹ 返回</div><div class="mfull-title">❤️ 我的收藏</div></div>
+  <div class="mfull-body">
+    <div id="fv-alpha"></div>
+    <div id="favorites-list"></div>
+    <div class="pager" id="favorites-pager">
+      <button onclick="favPage(-1)" id="favorites-prev">上一页</button>
+      <span id="favorites-pg-info">1/1</span>
+      <button onclick="favPage(1)" id="favorites-next">下一页</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 最新入库 ====== -->
+<div class="mfull" id="page-newest">
+  <div class="mfull-head"><div class="mfull-back" onclick="closeMPage('page-newest')">‹ 返回</div><div class="mfull-title">🆕 最新入库</div></div>
+  <div class="mfull-body">
+    <div id="newest-list"></div>
+    <div class="pager" id="newest-pager">
+      <button onclick="newestPage(-1)" id="newest-prev">上一页</button>
+      <span id="newest-pg-info">1/1</span>
+      <button onclick="newestPage(1)" id="newest-next">下一页</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== QUEUE TAB ====== -->
+<div id="tab-queue" style="display:none"></div>
+
+<!-- ====== REMOTE TAB（播放控制已移到常驻header，这里只剩 TV 界面+方向导航） ====== -->
+<div id="tab-remote" style="display:none">
+
+  <!-- Now playing -->
+  <div id="now-bar">
+    <span class="nb-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></span>
+    <div class="nb-info">
+      <div class="nb-title" id="nb-title">暂无播放</div>
+      <div class="nb-meta" id="nb-meta">—</div>
+    </div>
+    <span class="nb-status" id="nb-status"></span>
+    <div id="nb-prog-wrap"><div id="nb-prog-bar"><div id="nb-prog-fill"></div></div><div id="nb-prog-time"><span id="nb-tcur">0:00</span><span id="nb-ttot">0:00</span></div></div>
+  </div>
+
+  <!-- View controls -->
+  <div class="ctrl-section">
+    <div class="ctrl-title">📺 TV界面</div>
+    <div class="ctrl-row">
+      <div class="ctrl-btn" onclick="sendCtrl('home')">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span><span class="cl">主页</span>
+      </div>
+      <div class="ctrl-btn cyan" onclick="sendCtrl('fullscreen')">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M21 16v3a2 2 0 0 1-2 2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/></svg></span><span class="cl">全屏</span>
+      </div>
+      <div class="ctrl-btn" onclick="sendCtrl('back')">
+        <span class="ci"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg></span><span class="cl">返回</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- D-pad -->
+  <div class="ctrl-section">
+    <div class="ctrl-title">🕹 方向导航</div>
+    <div class="dpad">
+      <div class="dpad-btn dpad-empty"></div>
+      <div class="dpad-btn" onclick="sendCtrl('focus_up')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg></div>
+      <div class="dpad-btn dpad-empty"></div>
+      <div class="dpad-btn" onclick="sendCtrl('focus_left')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <div class="dpad-btn dpad-ok" onclick="sendCtrl('ok')">确认</div>
+      <div class="dpad-btn" onclick="sendCtrl('focus_right')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></div>
+      <div class="dpad-btn dpad-empty"></div>
+      <div class="dpad-btn" onclick="sendCtrl('focus_down')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+      <div class="dpad-btn dpad-empty"></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="tab-danmaku" style="display:none">
+  <div class="ctrl-section">
+    <div class="ctrl-title">🎉 气氛弹幕（发送到电视大屏）</div>
+    <div class="dm-emoji-row" id="dm-emoji-row"></div>
+    <div class="dm-rain-btn" onclick="sendRain()">🌧 加油雨</div>
+    <div class="dm-chips" id="dm-chips"></div>
+    <div class="dm-custom">
+      <input id="dm-input" maxlength="24" placeholder="自定义弹幕（最多24字）" onkeydown="if(event.key==='Enter')sendCustomDanmaku()">
+      <button onclick="sendCustomDanmaku()">发送</button>
+    </div>
+  </div>
+</div>
+
+<!-- 多房间：选择房间(每个房间有独立的点歌队列和播放端) -->
+<div id="room-pick-overlay" onclick="if(event.target===this)closeRoomPicker()">
+  <div id="room-pick">
+    <h3>🏠 选择房间</h3>
+    <div class="rp-sub">每个房间有独立的点歌队列和播放端，互不干扰。切换后页面会刷新。</div>
+    <div id="room-pick-list"><div class="rp-sub">加载中…</div></div>
+    <button class="rp-close" onclick="closeRoomPicker()">关闭</button>
+  </div>
+</div>
+<div id="queue-fab" onclick="switchTabByName('queue')">
+  🎵 当前队列 <span class="fab-badge" id="fab-badge">0</span>
+</div>
+<div id="toast"></div>
+
+<script>
+const searchInput = document.getElementById('search-input');
+const nicknameInput = document.getElementById('nickname-input');
+nicknameInput.value = localStorage.getItem('ktv_nick') || '';
+nicknameInput.addEventListener('change', ()=>localStorage.setItem('ktv_nick', nicknameInput.value));
+
+// ===== Tabs =====
+function switchTab(name, el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  document.getElementById('tab-search').style.display = name==='search' ? 'block' : 'none';
+  document.getElementById('tab-queue').style.display = name==='queue' ? 'block' : 'none';
+  document.getElementById('tab-remote').style.display = name==='remote' ? 'block' : 'none';
+  document.getElementById('tab-danmaku').style.display = name==='danmaku' ? 'block' : 'none';
+  if(name==='queue') renderQueue();
+}
+function switchTabByName(name){
+  const tabs=document.querySelectorAll('.tab');
+  const idx={'search':0,'queue':1,'remote':2,'danmaku':3}[name]||0;
+  switchTab(name, tabs[idx]);
+}
+
+// ===== WS =====
+let queueData=[];
+// 播放/暂停图标、原伴唱高亮：以前这两个纯粹是写死的展示，不反映 TV 端真实
+// 状态——手机上点了暂停，TV 是真的暂停了，但按钮图标看起来跟没点一样。
+// 现在服务端会把 TV 端上报的真实状态通过 'state' 消息广播过来，这里收到后
+// 调用 applyPlaybackState() 同步一次界面。
+const playIconSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8" fill="currentColor" stroke="none"/></svg>';
+const pauseIconSvg='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><line x1="10" y1="8" x2="10" y2="16"/><line x1="14" y1="8" x2="14" y2="16"/></svg>';
+function applyPlaybackState(state){
+  if(!state)return;
+  const paused=!!state.paused;
+  document.getElementById('r-play-icon').innerHTML=paused?playIconSvg:pauseIconSvg;
+  document.getElementById('r-play-label').textContent=paused?'播放':'暂停';
+  // 原唱/伴唱按钮：文字直接显示当前状态(点一下切换到另一个)，伴唱时同时保留紫色高亮
+  const isAcc=state.voice==='accompaniment';
+  document.getElementById('r-voice-btn').classList.toggle('voice-active',isAcc);
+  document.getElementById('r-voice-label').textContent=isAcc?'伴唱':'原唱';
+  document.getElementById('r-voice-btn').title=isAcc?'当前：伴唱（点击切换为原唱）':'当前：原唱（点击切换为伴唱）';
+  // 字幕按钮：默认显示；当前歌曲没有探测到字幕时显示「无字幕」并降低透明度
+  const subOn=state.subtitles!==false;
+  const subAvailable=state.subtitleAvailable!==false;
+  const subBtn=document.getElementById('r-subtitle-btn');
+  const subLabel=document.getElementById('r-subtitle-label');
+  if(subBtn&&subLabel){
+    subBtn.classList.toggle('subtitle-active',subAvailable&&subOn);
+    subBtn.classList.toggle('disabled',!subAvailable);
+    subLabel.textContent=!subAvailable?'无字幕':(subOn?'字幕开':'字幕关');
+    subBtn.title=!subAvailable?'当前歌曲没有字幕':(subOn?'当前：显示字幕（点击隐藏）':'当前：隐藏字幕（点击显示）');
+  }
+}
+
+// 需求(多终端播放进度同步)：手机遥控端没有 <video>，本来就只应该是
+// "控制端"，不需要在设置里给用户一个"播放端/控制端"的选择——直接固定
+// 声明角色为 controller 即可，跟 TV 网页(可能是"闺蜜机"点歌屏，需要
+// 手动选)不是一回事。deviceId 复用已有的 ktvdev(见下面 getDevId())，
+// 不再另起一个 key，保持"同一台设备只有一个 id"。
+let ctrlProgress={queueId:null,currentTime:0,updatedAt:Date.now(),paused:true};
+function connectWS(){
+  const ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws`);
+  ws.onopen=()=>{ sendWS({type:'role_announce',deviceId:getDevId(),deviceName:'手机遥控',role:'controller'}); };
+  ws.onmessage=ev=>{
+    const msg=JSON.parse(ev.data);
+    if(msg.type==='queue'){queueData=msg.data;onQueue();}
+    if(msg.type==='state'){applyPlaybackState(msg);}
+    if(msg.type==='progress'){ctrlProgress={queueId:msg.queueId,currentTime:Number(msg.currentTime)||0,updatedAt:Date.now(),paused:!!msg.paused};}
+  };
+  ws.onclose=()=>{ if(!(window.KtvRoom&&KtvRoom.blocked))setTimeout(connectWS,2000); };
+  window._ws=ws;
+}
+connectWS();
+// 每 500ms 用最近一次 progress 广播 + 流逝时间做一次插值，展示"看起来
+// 同步"的只读进度条，不产生任何媒体请求。
+function fmtTime(s){return`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;}
+function tickCtrlProgress(){
+  const playing=queueData.find(q=>q.status==='playing');
+  const fillEl=document.getElementById('nb-prog-fill'),curEl=document.getElementById('nb-tcur'),totEl=document.getElementById('nb-ttot');
+  if(!fillEl)return;
+  if(!playing||playing.duration==null){fillEl.style.width='0%';curEl.textContent='0:00';totEl.textContent='0:00';return;}
+  const total=playing.duration||0;
+  let cur=ctrlProgress.currentTime;
+  if(ctrlProgress.queueId===playing.queue_id&&!ctrlProgress.paused)cur+=(Date.now()-ctrlProgress.updatedAt)/1000;
+  if(total>0)cur=Math.min(cur,total);
+  fillEl.style.width=total?(cur/total*100)+'%':'0%';
+  curEl.textContent=fmtTime(cur);
+  totEl.textContent=fmtTime(total);
+}
+setInterval(tickCtrlProgress,500);
+
+function sendCtrl(action){ sendWS({type:'control',action}); }
+// ===== 音轨校对：一键原唱/伴唱互换 =====
+// 个别老歌的原唱/伴唱音轨是颠倒的：点一下把"当前房间正在播放的这首歌"的原/伴唱互换，
+// 服务端永久记住(以后每次播放都是对的)，电视端会自动重新加载并回到当前进度；再点一次还原。
+function swapAudio(){
+  fetch('/api/queue/swap-audio',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+    .then(r=>r.json().catch(()=>({})).then(j=>({ok:r.ok,j})))
+    .then(({ok,j})=>{
+      if(ok)showToast(j.audio_swap?'已互换原唱/伴唱 🔄（永久保存，再点一次还原）':'已还原原唱/伴唱 🔄');
+      else showToast(j.error||'操作失败');
+    })
+    .catch(()=>showToast('网络错误，请重试'));
+}
+
+// ===== 多房间：选择房间 =====
+function openRoomPicker(){
+  document.getElementById('room-pick-overlay').classList.add('open');
+  const box=document.getElementById('room-pick-list');
+  box.innerHTML='<div class="rp-sub">加载中…</div>';
+  KtvRoom.list().then(rooms=>{
+    const cur=KtvRoom.code();
+    box.innerHTML='';
+    rooms.forEach(r=>{
+      const isCur=(r.isDefault?'':r.code)===cur;
+      const el=document.createElement('div');
+      el.className='rp-item'+(isCur?' cur':'');
+      const n=document.createElement('div');n.className='rp-n';
+      n.textContent=r.name+(r.isDefault?'（默认）':'')+(r.hasPassword?' 🔒':'');
+      const mt=document.createElement('div');mt.className='rp-m';
+      mt.textContent=(r.playerOnline?'播放端在线':'无播放端')+(isCur?' · 当前':'');
+      el.appendChild(n);el.appendChild(mt);
+      el.onclick=()=>{ if(isCur){closeRoomPicker();return;} KtvRoom.choose(r); };
+      box.appendChild(el);
+    });
+    if(!rooms.length)box.innerHTML='<div class="rp-sub">暂无房间</div>';
+  }).catch(()=>{box.innerHTML='<div class="rp-sub">加载失败，请重试</div>';});
+}
+function closeRoomPicker(){ document.getElementById('room-pick-overlay').classList.remove('open'); }
+// 首次访问且有多个房间时自动弹出选择(只弹一次)
+KtvRoom.onNeedPick=function(){ openRoomPicker(); };
+
+// ===== 气氛弹幕 =====
+// 只负责"发"：{type:'danmaku',kind,icon,text,nick}，服务端校验限流后广播给播放端显示。
+// 5 个音效氛围按钮：点击后电视大屏播放对应音效，并下一场对应主题的表情雨
+const DM_SFX=[
+  {id:'scream',icon:'😱',label:'尖叫'},
+  {id:'applause',icon:'👏',label:'掌声'},
+  {id:'cheer',icon:'🎊',label:'喝彩'},
+  {id:'laugh',icon:'🤡',label:'怪笑'},
+  {id:'hooray',icon:'🥳',label:'欢呼'}
+];
+const DM_PRESETS=[
+  ['🌟','下届格莱美没你我不看！'],['💖','为你打call!'],['⭐','解锁人生新关卡！'],['🤘','你唱转音我要跪'],
+  ['🎤','请问我现在是在live house现场吗？'],['😍','这唱得也太好了！'],['💿','行走的CD！'],['🎙','你飙高音我飙泪'],
+  ['🎂','祝你快乐，不止生日！'],['🎁','生日道具已生效：365天好运buff'],['👑','寿星已开启主角光环，美好正在派送中！'],
+  ['🎈','新一岁的甜度已充值完毕，生日快乐！'],['🌹','恭喜距离退休又进一步！'],['🀄','早日暴富'],['🏮','行走的愿望收割机，生日快乐！'],
+  ['👏','太棒了！'],['🔥','全场最佳！'],['💪','加油！'],['🎶','再来一首！'],['🥳','氛围拉满！']
+];
+let dmLastAt=0;
+function dmSend(obj){
+  const now=Date.now();
+  if(now-dmLastAt<350)return; // 客户端也做一层防连点，服务端另有限流
+  dmLastAt=now;
+  obj.type='danmaku';
+  obj.nick=(nicknameInput.value||'').trim().slice(0,10);
+  sendWS(obj);
+}
+function sendSfx(o){dmSend({kind:'sfx',sfx:o.id,icon:o.icon,text:o.label+'！'});}
+function sendTextDanmaku(icon,text){dmSend({kind:'text',icon,text});}
+function sendRain(){dmSend({kind:'rain',icon:'💪',text:'加油!'});showToast('加油雨已发射 🌧');}
+function sendCustomDanmaku(){
+  const el=document.getElementById('dm-input');
+  const v=el.value.trim();
+  if(!v)return;
+  sendTextDanmaku('💬',v);
+  el.value='';
+}
+(function initDanmakuUI(){
+  const row=document.getElementById('dm-emoji-row');
+  DM_SFX.forEach(o=>{
+    const b=document.createElement('div');b.className='dm-emoji-btn';
+    b.innerHTML='<span class="dm-e">'+o.icon+'</span><span class="dm-l">'+o.label+'</span>';
+    b.onclick=()=>sendSfx(o);row.appendChild(b);
+  });
+  const chips=document.getElementById('dm-chips');
+  DM_PRESETS.forEach(([ic,tx])=>{
+    const c=document.createElement('div');c.className='dm-chip';c.textContent=ic+' '+tx;
+    c.onclick=()=>sendTextDanmaku(ic,tx);chips.appendChild(c);
+  });
+})();
+
+function sendWS(obj){ if(window._ws&&window._ws.readyState===1) window._ws.send(JSON.stringify(obj)); }
+
+function onQueue(){
+  const playing=queueData.find(q=>q.status==='playing');
+  // 需求(随机播放曲目不进已点队列)：is_autoplay=1 的行是曲库自动填充的，
+  // 不是真人点的歌，角标数字/已点列表都不该把它算进去；但它要是正好在播，
+  // 上面 playing 仍然用完整的 queueData 找，"正在播放"这块展示不受影响。
+  const visibleQueue=queueData.filter(q=>!q.is_autoplay);
+  document.getElementById('fab-badge').textContent=visibleQueue.length;
+  if(playing){
+    document.getElementById('nb-title').textContent=playing.title;
+    document.getElementById('nb-meta').textContent=`${playing.artist} · ${playing.nickname}`;
+    document.getElementById('nb-status').textContent='♪ 播放中';
+  } else {
+    document.getElementById('nb-title').textContent='暂无播放';
+    document.getElementById('nb-meta').textContent='—';
+    document.getElementById('nb-status').textContent='';
+  }
+  if(document.getElementById('tab-queue').style.display!=='none') renderQueue();
+}
+
+// 需求(已点列表后台预加载)：跟 TV 端同一套逻辑，服务端会在队列变化时后台
+// 异步探测每首歌时长(见 server/queuePreload.js)，探测完成后通过 WebSocket
+// 广播新队列。探测还没完成/失败时 q.duration 是 null，不显示这一截，避免
+// 出现"0:00"这种误导性假时长。
+function qDurLabel(q){return (q.duration!=null&&isFinite(q.duration))?` · ${Math.floor(q.duration/60)}:${String(Math.floor(q.duration%60)).padStart(2,'0')}`:'';}
+function renderQueue(){
+  const el=document.getElementById('tab-queue');
+  el.innerHTML='';
+  const visibleQueue=queueData.filter(q=>!q.is_autoplay); // 同上：随机播放曲目不在已点列表里显示
+  if(!visibleQueue.length){el.innerHTML='<div style="color:var(--sub);text-align:center;padding:40px">队列空空如也</div>';return;}
+  visibleQueue.forEach((q,i)=>{
+    const row=document.createElement('div');
+    row.className='q-row'+(q.status==='playing'?' playing':'');
+    row.innerHTML=`
+      <div class="q-num">${q.status==='playing'?'♪':i+1}</div>
+      <div class="q-info"><div class="q-title">${q.title}</div><div class="q-meta">${q.artist} · ${q.nickname}${qDurLabel(q)}</div></div>
+      <div class="q-acts">
+        ${q.status!=='playing'?`<button class="q-act top" onclick="topSong(${q.queue_id})">置顶</button>`:''}
+        <button class="q-act del" onclick="delSong(${q.queue_id})">✕</button>
+      </div>`;
+    el.appendChild(row);
+  });
+}
+
+async function topSong(id){ await fetch(`/api/queue/${id}/top`,{method:'POST'}); }
+async function delSong(id){ await fetch(`/api/queue/${id}`,{method:'DELETE'}); }
+
+// ===== Song search & add =====
+// Bug修复：以前未输入搜索词时 loadSongs() 直接调用不带 page/pageSize 参数的
+// /api/songs，服务端在这种情况下会把整个曲库一次性返回——曲库特别大时(几千
+// ~上万首)首屏加载慢、卡顿明显。现在统一带上分页参数，每页 20 首，翻页时
+// 只拉当前页，输入搜索词时同样按分页请求、每次输入重新从第 1 页开始。
+const SONG_PG_SIZE=20;
+let songPg=1,songPgTotal=1,songQuery='';
+let searchTimer;
+// 需求：顶部搜索框有内容时显示"搜歌结果"(原有分页逻辑不变)，没内容时显示
+// 点歌入口 HUB（歌名点歌/歌手点歌/分类点歌/热歌排行/最近唱过/我的收藏/
+// 最新入库），不再像以前那样一进"点歌"tab就直接拉整个曲库分页列表。
+searchInput.addEventListener('input',()=>{
+  clearTimeout(searchTimer);
+  searchTimer=setTimeout(()=>{songQuery=searchInput.value.trim();songPg=1;updateSearchView();},220);
+});
+function updateSearchView(){
+  const hub=document.getElementById('song-hub');
+  const list=document.getElementById('song-list');
+  const pager=document.getElementById('song-pager');
+  const empty=document.getElementById('empty');
+  if(songQuery){
+    hub.style.display='none';
+    list.style.display='flex';
+    loadSongs();
+  }else{
+    hub.style.display='grid';
+    list.style.display='none';
+    pager.style.display='none';
+    empty.style.display='none';
+  }
+}
+async function loadSongs(){
+  const params=new URLSearchParams({page:songPg,pageSize:SONG_PG_SIZE});
+  if(songQuery)params.set('q',songQuery);
+  const res=await fetch(`/api/songs?${params}`);
+  const data=await res.json();
+  // 服务端只有带了 page&pageSize 才会返回 {items,total,page,pageSize,totalPages}
+  // 这种带分页元信息的对象，兜底一下万一拿到裸数组也不报错。
+  const items=Array.isArray(data)?data:data.items;
+  songPgTotal=Array.isArray(data)?1:(data.totalPages||1);
+  renderSongsInto(document.getElementById('song-list'),items,'没有找到相关歌曲');
+  document.getElementById('empty').style.display=items.length?'none':'block';
+  renderSongPager();
+}
+function songPage(d){
+  const t=Math.max(1,songPgTotal);
+  songPg=Math.max(1,Math.min(t,songPg+d));
+  loadSongs();
+}
+function renderSongPager(){
+  const el=document.getElementById('song-pager');
+  el.style.display=songPgTotal>1?'flex':'none';
+  document.getElementById('song-pg-info').textContent=`${songPg}/${songPgTotal}`;
+  document.getElementById('song-prev').disabled=songPg<=1;
+  document.getElementById('song-next').disabled=songPg>=songPgTotal;
+}
+// 通用歌曲列表渲染：点歌入口 HUB 下的 7 个子页面（歌名/歌手作品/分类/热歌/
+// 最近/收藏/最新入库）都复用这一份，跟 TV 端 renderSongs(el,songs) 是同一套
+// 「❤收藏 + ＋点歌」按钮逻辑，只是外层容器换成移动端的 el 参数。
+function renderSongsInto(el,list,emptyText){
+  el.innerHTML='';
+  if(!list.length){el.innerHTML=`<div class="mfull-empty">${emptyText||'暂无歌曲'}</div>`;return;}
+  const frag=document.createDocumentFragment();
+  list.forEach(s=>{
+    const c=document.createElement('div');
+    c.className='song-card';
+    const favKey='fav_'+s.id;
+    const isFaved=localStorage.getItem(favKey)==='1';
+    c.innerHTML=`
+      <div class="info"><div class="title">${s.title}</div><div class="artist">${s.artist||''}</div></div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn-fav${isFaved?' faved':''}">❤</button>
+        <button class="btn-add">＋</button>
+      </div>`;
+    c.querySelector('.btn-add').onclick=()=>addSong(s.id, s.title);
+    c.querySelector('.btn-fav').onclick=()=>toggleFav(s.id, c.querySelector('.btn-fav'));
+    frag.appendChild(c);
+  });
+  el.appendChild(frag);
+}
+async function addSong(id, title){
+  const nick=nicknameInput.value.trim()||'匿名歌手';
+  await fetch('/api/queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({song_id:id,nickname:nick})});
+  showToast(`《${title}》已加入队列 🎶`);
+}
+
+function getDevId(){
+  let id=localStorage.getItem('ktvdev');
+  if(!id){id='m-'+Math.random().toString(36).substr(2,9);localStorage.setItem('ktvdev',id);}
+  return id;
+}
+async function toggleFav(id,btn){
+  const key='fav_'+id;
+  const faved=localStorage.getItem(key)==='1';
+  if(faved){
+    await fetch(`/api/favorites/${id}?device=${getDevId()}`,{method:'DELETE'});
+    localStorage.removeItem(key);btn.classList.remove('faved');showToast('已取消收藏');
+  } else {
+    await fetch(`/api/favorites/${id}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({device:getDevId()})});
+    localStorage.setItem(key,'1');btn.classList.add('faved');showToast('已收藏 ❤');
+  }
+  allFavList=[]; // 收藏状态变了，"我的收藏"子页面缓存作废，下次打开重新拉取
+}
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1600);
+}
+
+/* =====================================================================
+   点歌入口 HUB：歌名点歌 / 歌手点歌 / 分类点歌 / 热歌排行 / 最近唱过 /
+   我的收藏 / 最新入库 —— 全部复用 TV 端 (docker/web/tv/index.html) 同一套
+   /api/songs /api/artists /api/history /api/charts /api/favorites 接口，
+   拼音首字母搜索/字母键盘/语种风格筛选/分页逻辑也跟 TV 端保持一致，
+   只是把「遥控器方向键选中」换成移动端直接触屏点击。
+   ===================================================================== */
+function esc(s){return String(s||'').replace(/'/g,"&#39;");}
+
+// ---- 拼音首字母（与 TV 端同一份映射表，保证两端搜索结果一致） ----
+// 拼音首字母（完整版）：PYT 覆盖 U+4E00–U+9FFF 全部汉字(含繁体)，下标=码点-0x4E00，
+// 值为最常用读音的首字母，'#'=无读音；PYX 登记 GB2312 常用多音字的其它读音首字母
+// (汉字紧跟若干大写字母)。标点/空白/日韩文等无法转成字母的字符一律跳过，
+// 全角字母数字按半角处理。取代旧的"302字表 + localeCompare 兜底"：那套在没有
+// 完整 ICU 的 WebView/浏览器里 localeCompare 不是拼音序，生僻字全变 '#'，
+// 标题里带标点也会混进 '#'，都会导致 startsWith 匹配失败。
+const PYT="YDKQSXHWZSSXJBYMGCCZQPSSQBYCDSCDQLDYLYBSGJGYQZJJFGCCLZZBWDWZJLJPFYYNWJJTMYYZWZHFLYPPQHGCCYYYMJQYXXGJXHSDSJNJJSMHMLZRXYFSNGSYCZQZGGLLYJLMYZSSECYKYYHQWJSSGGYXYQYJTWKDJHYCHMYXJTLXJYQBYXDLDWRRJJWYSRLDZJPCBZJJBRCFSLBCZSTZFXXTHTRQGGBDLYCCSCYMMRFCYQZPWWJJYFCRWFDFZQPYDDWYXKYJAWJFFXJPDFTZYHHYCYSWCCYQSCLCXXWZZXNBGNNXBXLZSQCBSGPYSYZDHMDZBQBZCWDZZYYTZHBTSYYFZGNTNXQYWQSKBPHHLXGYBFMJEBJHHGQTJCYSXSTKZGLYCKGLYSMZXYALMELDCCXGZYRCXSDLTJZCQKCNNJWHJCZZCQLJSTSTBNXBTYXCEQXGKWJYFLZQLYHJQSPSFXLFPBYQXXXYDCCZYLLLSJXFHJXPJBCFFYABYXBHCZBJYCLWLCZGGBTSSMDTJCXPTHYQTGJJSCJFZKJZJQNLZWLSLHDZBWJNCJZYZSQNYCQYRZCJJWYBRTWPYFTWEXCSKDZCTBXHYZCYYJXZCFBZZMJYXXCDCZOTTBZLJWFCGSZSXFYRLNYJMBDTHJXSQJCCSBXYYTSYFBJDZTGBCNCLCYZZBSACYZZSCJCSHZQYDXLBPJLLMQXTYDZXSQJTZPXLCGLQCCWJBHCTDJJSFXJEJJTLBGXSXJMYJJQPFZASYJNCYDJXKJCDJSZCBARTCCLNJQMWNQNCLLLKBYBZZSYHQCLTWLCCRSHLLZNTYLNEWYZYXCZXXGDKDMTCEDEJTSYYS#DQDFMSD#JLHRWNQLYBGLXHLGTGXBQJDZFYJSJYJCJMRNYMGRCJCZGJMZMGXMMRYXKJNYMSGMZJYMKLFXMBDTGFBHCJHKYLPFMDXLQJJSMTQGZSJLQDLDGJYCALCMZCSDJLLNXDJFFFFJCZFMZFFPFKHKGDPQXKTACJDHHZDDDRRCFQYJKQCCWJDXHWJLYLLZGCFCQDSMLZPBJJPLSBCJGGDCKKDEZSQSCKJGCGKDJTJLLZYCXKLQSCGJCLTFPCQCZGWBJDQSDJJBYJHSJDDWGFSJGDKCCCTLLPSPKJGQJHZZLJPLGJGJJTHJJYJZCJMLZLYQBGJWMLJKXZDZNJQSYZMLJLLJKYWXMKJLHSKJGBMCLYYMKXJQLBMCLKMDXXKWYXWSLMLPSJQJCQXYJFJTJDXMXXLLCRQBSYJBGWYWXGGBCYXPJTGPEPFGDJGBHBNSFJYZJKJKHXQFGQZKFHYGKHDGLLSDJJXPQYKYBNQSXQNSZSWHBSXWHXWBZZXDMNDJBSBKBBZKLYLXGWXJJWAQZMYWSJQLCJXXJQWJEQXSCWETLZHLYYYSDZPYQYZCPTLSHTZCFYCYXYLJSDCJJAGYSLCLLYYYSGLRQQELDXZSCCCCADYCJYSFSGBFRSSZQSBXJPSJWSDRCKGJLGDKZJZBDKTCSYQPYHSTCLDJLHMXMCGXYZHJDCTMHLTXZXYLYMOHYJCLTYFBQQJBFBDFEHTKSQHZYWWCNXXCDWHHWGYJLEGMDQCWGFJHCSNTWYDOLBYGWQWESJPWNMLRYDZSZTXYQPZGCWXHNGPYXSHMDQJGZTDPPBFYHZHHJYFDZWKGKZBLDNTSXHQEEGZXYLZMMZYJZGSZXKHKHTXEXXGYLYAPSTHXDWHZYDPXAGKYDXBHNHXKDFJNMYHYLPMGOCSLNZHKXXLBZZLBMLSFBHHGSGYYGGBHSCYAJTXWLXTZQCWZYDQDQMMGDQLLSZHLSJZWFJHQSWSCELQAZYNYTLSXTHAZNKZZSDHLACXTWWCSGQQTDDYZBCCHYQZFLXPSLZYGPZSZNGLYDQCBDLXJTCTAJDKYWNSYZLJHHDZCWNYYZYOMHYCHHHXHJKZWSXHDNXLYSCQYDPCLYZWMYPBKXYJLKZHTYHAXQSYSHXASMCHKDSCRSWJPWQSGZJLWWSCHS#HSQNHZSNGNDAQTBAALZZMSSTDQJCJKTSCJAXPLGGXHHGOXZCXPDMMHLDGTYBYSJMXHMRCPLXJZCKZXSHFLQXCCDHXEZFCHZCCDYTCJYXQHLXDHYPJQXNLSYYDZOZJNYXQEZYSJYAYJKYPDGHDDXSPPYZNDLTHRHXYDPCJJHTCXMCTLHBYNYHMHZLLHNXMYLLLMDCPPXHMXDKYCYRDLTXJCHHZNXCLCCLYLNZSXZJZZLNNLLWHYQSNJHXYNTTDKYJPYCHHYEGKCTTWLGQRLGGTGTYGYHPYHYLQYQGCWYQKPYYYTTTTLHYHLLTYTTSPLKYZWGYWGPYDQQZZDQXSKCQNMJJZZBXYQMJRTFBBTKHZKBJDJJKDJJTLBWFZPBTKQTZTGPDGNTPJYFALQMKGXBCCLZFHZCLLLLADPMXDJHLCCLGYHDZFGYDDGCYYFGYDXKSSEBDHYKDKDKHNAXXYBFBYYHXCQGABFQYJJDMLJCSJZLLPCHBSXGJYNDYBYQSPQWJLZKCDDTACCBKZDYZYPJZQSJNKKTKNJDJGYEPGTLFYQKASDNTCYHBLGDZHBBYDMJRYGKZYHEYYBCMCDTYFZJJHGCJPLXHLDWXJJKYTCYKSSSMTWCTTQZLZBSZDTWZXGZAGYKTYWXLHLCPBCLLOQMMZSSLCMBJCSZZKYDCZXGQJDSMCYTZQQLWZQZXSSBPKDFQMDDZDSDDTDMFHTDYZJAQJQKYPBDJYYXTLJHDRQXXXHAYDHRJLKLYTWHLLRLLRCXYLBWSRSZZSYMKZZHHKYHXKSMZSYZGCJFBZBSQLFCXXXNXKXWYMSDDYQWGGQMMYHCDZTTFGYYHGSTTTYBYKJDHKYJBELHDYPJQNFXFDQKZHQKZBYJTZBXHFDXBDASWHAWAJLDYJSFHBLDNNDNQJTJNCHXFJSRFWHZFMDRFJYHWZPDJKZYJYMFCYZNYNXFBYTFWFWYGDBNZZZDNYTXZEMMQBSQEHXFZMBMFLZZSRSYMJGSXWZJSPRYDJSJGXHJJGLJJYNZJJXHGJKYMLPEYYCSYSGQZSWHWLYRJLPXSLCXMFSMWKCCTNXNYNPNJSZHDZEPTXMWYWAYYSYWLXJQZQXZDCLAEELMCPJPCLWBXSQHFWRTFFJTNQJHJQDXHWLBYCCFJLALKYYJLDXHHYCSTDYWNCJTXYWDRMDRQHWQCMFJDYZMHMAYXJWMYZQSXTLMRSPWWCHAJBXTGCYPXYYRRCLMPAMGKQJSZYJRMYJSNXTPLNBAPPYPYLXMYZKYNLDGYJZCZHNLMZHHANQMPGWQTZMXXMLLHGDZXYHXKRXYCJMFFXYHJFSBSSQLHXNDYCANNMTCJCYPRRNYTYQNYYMBMSXNDLYLYSLJNLQYSHQMLLYZLZJJJKYMZCSFBZXXMSTBJGNXYZHLSNMCQSCYZNFZLXBRNNNYLMNRTGZQYSATSWRYHYJZMZDHZGZDWYBSSCSKXSYHYTSXGCQGXZZBHYXJSCRHMKKBSCZJYJYMKQHZJFNBHMQHYSNJNZYBKNQMCJGQHWLSNZSWXKHLJHYYBQCBFCDSXDLDSPFZFSKJJZWZXSDDXJSEEEGJSCSSMGCLXXKYWYLLYMWWWGYDKZJGGGTGGSYCKNJWNJPCXBJJTQTJWDSSPJXZXNZXWMELPTFSXTLLXCLJXJJLJSXCTNSWXLEHHLYQRWHSYCSQRYBYAYWJEJQFWQCQQCJQGXALDBZZYJGKGXPLTQYFXJLTPADKYQHPMATLCPDHKXMTXYBHBLEFXDLEEGQDYMSAWHZMLJTWYQXLYJZLJEEYXBQQFFNLYXRDSCTGJGXYYLKLLXQKCCTLHJLQMKKZGCYYGLLLJDZGYDHZWXPYSJBZKDZGYZZHYWYFQYTYZSZYEZKLYMHJJHTSMQWYZLKYYWZCSRKQYQLTDXWCDRJKLWSQZWBDCQYNCJSRSZJLKCDCDTLZZZACQQCZDDXYPLXCBQJYLZLLLJDDZJGYJYJZYXNYYYNXJXKXDAZWYRDLJYYYRJLGLLDRXJCYKYWNQCCLDDNYYYKYCKCZHJXCCLGZQJGJWPPCQQJYSBZZXYJXJBXJFZBSBDSFNSFPZXHDWZTDMPPTBLZZBZDMYYPQJRSDZSQZSQXBDGCPZSWDWCSQZGMDHZXMWWFYBPDGPHTMJTHZSMMBGZMBZJCFZHFCBBZMQCFMBCMCJXLGPNJBBXGYHYYJGPTZGZMQBQDCGYBJXLWZKYDPDYMGCFTPFXYZTZXDZXTGKMTYBBCLBJASKYTSSQYYMSCXFJEGLSLLSZBQJJJAKLYLDLYCCTSXMCWFGKKBQXLLLLJYXTYLTYXYTDPJHNHGNKBYQNFJYYZBYYESSESSGDYHFHWTCJBSDZJTFDMXHCNJZYMQWSRXJDZJQPDQBBSDJGGFBKJBXDGJHMGWJJJGDLLTHZHHYYYYYYSXWTYYYCCBDBPYPZYCCZTJPZYWCBDLFWZCWJDXXHYHLHWCZXJTCZLCDPXDJCZCZLYXJJSJBHFXWPYWXZPTDZZBDCCJHJHMLXBQXXBYLRDDGJRRCTTTGQSCZWMXFYTMWZCWJWXJYWCSKYBZQCCTTQNHXNKXXKHKFHTSWOCCJYBCMPZZYJBNNZPBTHHJDLSCDDYTYFJPXYNGFXBYQXCBHXCBSXTYZDMZYSNXSXLHKMZXLTHDHKGHXJSSHQYHHCJYXGLHZXCSNHEKDTGQXQYPKDHEXTYKCNYMYYYPKQYYTJXZLTHHQTBYQHXBMYHSQCKWWYLLHCYYLNNEQXQWMCFBDCCMLJGGXDQKTLXKGNQCDGZJWYJJLYHHQTTTNWCHHXCXWHESZJYDJCCDBQCDGDNYXZDHCQRXCBMZTQCBXWGQWYYBXHMBYMYKDYECMQKYAQYNGYZSLFYKKQGYSSQYSHJGJCNXKZYCXSBKYXHYYLSTYCXQTHYSMGSCPMMGCCCCCMTZTASMGQZJHKLOSQYLSWTMQSYQKDZLJQQYPLCYCZTCQQPBBQJZCLPKHQCYYXXDTDDDSJCXFFLLCHQXMJLWCJCXTSPYCXNDTJSHJWXDQQJCKXYAMYLSJHMLALYKXCYYDMAMDQMLMCZNNYYBZKKYFLMCHCMLHXRCJJHSYLNMTJGGZGYWJXSRXCWJGJQHQZDQJDZJJZKJKGDZQGJJYJYLHZXXCDQHHHESTMHLFSBDJSYYSHFYSSCZQLPBDRFRZTZDKYKGSCTGKWDQZRKMSYNBCRXQBJYFAXPZZEDZCJYKBCJWHYJBQDZYWNYSZPTDKZPFPBAZTKLQYHBBZPNBPTYZZYBHNYDCPJMMCYCQMCJFZZDCMNLFPBPLNGQJTBTTAJZPZBBDNJKLJQYLNBZQHKSJZNGGQSCZKYXCHPZSNBCGZKDDZQANZGJKDNTLZLDWJLJZLYWTXNDJZJHXYATNCBGTZCSSKMNJPJYTSRWXCFJWJJTKHTZPLBHSNJZSYJBWBZYZLSTLSBJHDWWQPSLMMFBJDWAJYZCCJTBNNRZWQXCDSLQGDSDPDZHJTQQPSQLYYJZLGYHSZLCTCBJTKTYCZJTQKBPJLGMJZDMCSGPYNJZJJYYKNHRPWSZXMTNCSZZYXYBYHYZAXYWKCJTLLCKJJTJHGCXDXYQYCZBYWBLWQCGLZGJGQRQCCZSSBCRBCSKYDZNLJSQGXSSJMECNSTZTPBDLTHZWHQWQTZEXNQCZGWESKSSBYBSTSCSJCCGBFSDQSZLCCGLLLZGHZCTHCNMJGYZAZNMCKCSTJMMZCKBJYGQLJYJPPLDXRGZYXCCSNHSHGDZNLZHZJJCDDCBCJFLBFQBCZZWPQDNHXLJCTHQWJGYLNLSZZPCJDSCQQHJQKDXKPBAJYEMSMJTZDXLCJYRYYNWJBNGZZKMJXLTBSLLRTPYLCSZNXJHLLHYLLQQZQLXYMRCWCXSLJMCZLTZLDWDJJLLNZGGQXPPSKYGYGGBFZPDKMWGHCXMCGDXJMCJSDYCABXJDLNBCDDYGSKYDJTXDJJYXMSAQAZDZFSLQXYJSJZYLBLXXWXQQZBJZLFBBLYLWDSLJHXJYZJWTDJCYFQZQZZDCSXZZQLZCDZFCHYSPYMPQZMLPPLFFXJJNZZYLSJYYQZFPFZKSYWJJJHRDJZZXTXXGLGHTDXCSKYSWMMTCWYBAZBJKSHFHGCXMHFQHYXXYZFTSJYZBXYXPZLCHMZMBXHZZSSYFDMNCWDABAZLXKTCSHHXKXJJZJSTHYGXSXYYHHHJWXKZXCSBZZWWHHCWTZZZPJXSNXQQJGZYZAWLLCWXZFXGYXYHXMKYYSWSQMNJNAYCYSPMJKGWCQHYLAJJMZXHMMCNZHBHXCLXTJPLTXYJHDYYLTTXFSZHYXXSJBJYAYRSMXYPLCKDLYHLXRLNLLSTYZYYQYGYHHSCCSMCCTZCXHYQFPYYRPFFLFQTNTSZLLZMHWTCJQYZWTLLMLMDWMBZSSMZRBPDDDLGJJBXCCSRZQQYGWCSXFWZLXCCRBTDZMCYGGDLQSGTJMWLJMYMMSYHFBJDGYXCCPSHXCZCSBSJWJGJMPBWAFFYFNXHYDXZYLREMZGZCYHSSZDLLJCSQFZXXKPTXZGXJJGBMYYYSNBDYLBNLHBFZDCYFBMGQRRMSSZXYSGTZNNYDZZCDGBJAFJBDKNZBLCSSCPSGZYCJSZLMLRZZBZZLDLSLLYSXSQZQLYXZLSGKBRXBRBZCYCXZJZEEYFGKLZLYYHGYSGZLFJHGTGWKRAAJYZKZQTSSHJJXDZYZ#YJLZYRZDQQHGJZXSSZBTKJPBFRTJXLLFQWJGSLQTYMBLPZDXTZAGBDHZZRBGJHWNJTJXLHSCFSMWLLDQYSJTXKZSCFWJLBXFTZLLJZLLQBLCQMQQCGCDFPBBHZCZJLPYYGJDTGWDCFCZQYYYQYSRCLQZFKLZZZGFFSQNWGLHJYCJJCZLQZCYJBJZZBPDCCMHJGXDQDGDLZQMFGPSYTSDYFWWDJZJYSXYYCJCYHZWPBYHXRYLYBHKJKSFXTZJMMCHHLLTNYYMSXXYZPYJJYCDYZWMTJJKQYRHLLQXPSGTLWYCLJSCBXJYZFNMLRGJJTYZBSYZMSJYJHGFZQMSYXRSZCWTLRTQZSSTKXGQGGSPTGCDNJSGCQCQHMXGGZTQYDJKZDLBZSXJLHYQGGGTHQSCPYHJHHGNYGKGGCMJDZLLCCLXQSFTGZSLLLMLCSKCTBLJZZSZMMNYTPZSXQHJCJYQXYEXZQZCPSHKZZYSXCDFGMWQRLLQXRFZTLYSDCTMJCSJJDHJNXTNRZTZFQRHQGLLGCXSZSJDJLJCYTSJTLNYXHSZXCGJZYQPYLFHDJSBPCCZGJJJQZJQDYBSSLLCMYTTMQTBHJQNNYGKYNQYQMZGCJKPDCGMYZHQLLSLLCLMHOLZGDYLFZSLJCQZLYLZCJESHNYLLJXGJXLYJYYYXNBCLJSSWCQQCJYLLCLDJYLLZLLBNYLGQCHXYYQOXCCQKYJXXHYKLKSXAYQCCQKKKKCSGYXXYQXYGWTJOHTHXPXXCSSHCYEYCHZZCBWQBBWJQCSCSZSSLZYLGDESJZMMYMCYTSDSXXSCJPQQSQYLYFZYCHDJDZYWCBTJSYDJHCYDDJLBDJJSODZYQYSQKXXDHHGQJYOHDYXWGMMMAJDYBBBPPBCMHCPLJZSMTXERXJMHQDSTPJDCBSSMSSSTHJTSLMMTRCPLZSZMLQDSDMJMQPNQDXCFYNBFSDQQYXHYAYKQYDDLQYYYSSZBYDSLNTFGTZQBZMCHDHCZCWFDXTMQQSPHQWWXSRGJCWTJTZZQMGWJJRJHTQJBBGWZFXJHNQFXXQYWYYHYSCDYDHHQMNMDMMCPBSZPPZZGLMZFOLLCFWHMMSJZTTTHLMYFFYTZZGZYSKJJXQYJZQPHMBZZLYGHGFMSHPCFZSNCLPBQSNJSZSLXJFPMTYJYGBXLLDLXPZJYPJYHHZCYWHJYLSJEXFSSZYWXKZJLLADTMLYMQJPWXXHXSKTQJEZRPXXZGHMHWQPWQLYJJQJJZSZCFHJLCHHNXJLQWZJHBMZYXBDHHYPYLHLHLGFWLCFYYTLHJJCJMSCPXSTKPNHJXSNTYXXTESTJCTLSSLSTDLLLWWYHDHRJZSFGXSSYCZYKWHTDHWJSLHTZDQDJZXXQGGYLTZPHCSQFZLNJTCLZPFSTPDYNYLGMJLLYCQHYNSBCHYLHQYQTMZYBBYWRFQYKJSYSLZDYJMPXYYSSRHZJNYQTQDFZBWWDWWRXCWHGYHXMKMYYYHMSMZHNGCEPMLQQMTCWCTMHMXJPJJHFXYYZSJZHTYBMSTSYJDTJJQYTLHYNBYQZLCXCNZWSMYLKFJXLWGBYPJYTYSYLYMZCKTTWLGSMZSYLMPWLZWXWQZSSAQSYXYRHSSNTSRAPCCPWCMGDHHXZDZXFJHGZTTSBJHGYGLZYSMYCLLLYBTYXHBBZJKSSDMALHHYCFYGMQYPJYCQXJLLLJGCLZGQLYCJCCTOTYXMTMSHLLWCGFXYMZMKLPSZZZXHHJYSLCTYJCYHXSGYXZKXLZWPYJPDHJWPJPWSQQXLXXDHMRSLZCYZWSTCXKYSTZSHBSCCSTPLWSSCJCHJLCGCHSSPHYLHFHHXJSXYLLNYLMZDHZXYLSXLWZYHCLDYAHZCMDDYSPJTQJZLNGJFSJSHCTSDSZLBLMSSMNYYMJQBJHRCWTYYDCHQLJAPZWBGQYBKFCMJWLZLLYYLSZYDWHXPSBCMLJPSCGBHXLQHYRLJXYSWXHXZLLDFHLSLYMJLJYFLYJYCDRJLFSYZFSLLCQYQFGJYHYSZLYLMSTDJCYHBZLLNWLXXYGYYHBMGDHXXHHLZZJZXCZZZCYQZFNJWPYLCPKPYKPMCLGKDGXZGGWQBDXZZKZFBXXLZXJTPJPTTBYTSZZDWSLCHZHSLTJXHQLHYXXXYWZYSWTMZKHLXZXZPYHGCHKJFSYH#TJRLXFJXPTZTWHPLYXFCRHXSHXKJXXYHZJDXJWYLHYHMJDBFLKHTXCWHCFWJCFPQRXQXCYYYJYGRPXGSCSXNGWCHKZDXHFLXXHJJBYZWTSXNNCYJJYMSWZJQRMHXZWFQSYLZJZGBHYNSLBGTTCSEBHXXWXYHHXYXNSQYXMLYWRGYQLXBBCLJSYLPSYTJZYHYZAWLHORJMKSCZJXXXYXCHCYTRYXQJDDSJFSLYLTSFFYXLMTYJMJJYYYXLTZCSXQZLHZXLWYXZHDNLRXHXJCDYHLBRLMBRLLAXKSLLLJLYXXLYCRYLCJCGJCMTLZLLCYZZPZPCYAWHJJFYBDYYZSEPCKZDQYQPBPCJPDCYZBDBBCYYDYCNNPJMTMLRMFMMGWYGBSJGYGSMDQQQZTXMKQWGXLLPJGZBQCDJJJFPKJKCXBLJMSWMDTQJXLDLPPBXCWKCQQBFQJCZAGZGMYKBHYYHZYKNDKZMBPJYSPXTHLFPNYYGXJDBKXNHHJHZJXSTRSTLDXSKZYSYBMXJLXYSLBZYSLHXJPFXBQNBYLLJQKYGZMCYZZYMCCSLDLHZGWFWYXZMWCXTYNXJHBYYMCYSBMHYSMYDYSHQYZCHMJJMZCAAHCBJBBHPLXTYLSXSDJGJDHKXXTXXNBHNMLNGSLTXMRHNLXQJXMZLLYSWQGDLBJHDCGJYQYCMHWFWJYBBBYJMJWJMDPWHXQLDYAPDFXXBCGJSPCKRSSYZJMSLBZZJFLJJJLGXZGYXYXLSZQYXBEXYXHGCXBPLDYHWECDWWCJMBTXCHXYQXLLXFLYXLLJLSSFWDPZSMYJCLMSWTCZBCHQEKCQBWLCGYDBLQPPQZQFJQDJHYMMCXTXDRMJWRHXCJZCLQXDYYNHYYHRSLSRSYWWZJYMTLTLLGZQCJZYABSCKZCJYCCQLJSQXALMZYYYWLWDXZXQDLLQSHGPJFJLJHJABCQZDJGTHHSSTCYJLBSWZLXZXRWGLDLZRLZQTGSLLLLZLYMXQGDZHGBDBHZPBRLW#XQBPFDWO##WHLYPCBJCC#DMBZPBZZ#CYQXLDOMZBLZWPDWYYGDSTTHCSQSCCRSSSYSLFYBFNTYJSZDFNDPTHTZZMBBLXLCMYFFGTJJQWFTMDPJWDNLBZCMMCTGBDZLQLPYFHSYMJYLSDCHDZJWJCCTLJCLDTLJJCPDDPJDSSZYNNDBJLGGJZXSXNLYCYBJJQXCBYLZCFZPPGKCXZDZFZTJJFJSJXZBNZYJQTTYJWHTYCZHYMDJXTTMPXSFLZCDWSLSHXYBZGTFMLCJTACBBMGDEWYCYZCDSZCYHFLYCTYGWHKJYYLSJCXGYWJCBHLCSNDDBTZBSCLYZCZZSSQDLLMQYYHFLLQLLXFDYHABXGGNYWYYPLLSDLDLLBJCYXJZMLHLJDXYYQYTDLLLBBGBFDFBBQJZZMDPJHGCLGMJJPGAEHHBWCQXAXHHHZCHXYPHJAXHLPHJPGPZJQCQZGJJZZGZDMQYYBZZPHYHYBWHAZYJHYKFGDPFQSDLZMLJXJPGALXZDAGLMDGXMWZQYTXDXXPFDMMSSYMPFMDMMKXKSYZYSHDZKJSYSMMZZZMSYDNZZCZXBMLSTMDDNMXCKJMZTYYMZMZZMSSHHDCCJEMXXKLJSTGWLSQLYJZLLSJSSDBPMHNLYJCZYHMXXHGZCJMDHXTKGRMXFWMCKMWKDCKSXQMMMFZZYDKMSCLCMPCGMWRPXQPZDSSLCXKYXTMLGJYAHZJGZQMCSNXYHMMPMLKJXMHLMLGMXCTKZMJJYSZJSYSZHSYJZJCDAJZYBSDQJZGWZKGXFKDMSDJLFMEHKZQKJBEYPZYSZCDWYJFFMZJYKTTDZZEFMZLBNPPLPLPBPSZALLTYLKCKQZKGENQLWAGXXYDPXLHSXQQWQYKXQCLHYXXMLYCCWLYMQYSKYCHLCJNSZKPYZKCQZQLJBDMDJHLASQLBYDWQLWDNBQCRYDDDTJYBKBWSZDXDTNPJDTCTQDFXQQMGNSECLSTBHPWSLCTXXLPWYDZKLZYGZCQAPLLKCCYLBQMQCZQCLJSLQZDJXLDTHPZQDLJJXZQDJYZHKZLJCYQDYJPPYPEAKJYRMPCBYMCXKLLZLLFQPYLLLMBSGLCYSSLRSYSQTMXYXQQZBDZRYSYZTFFMZZSMZQHZSSCCMLYXWTPZGXZJGZGSJSGKDDHTQGGZLLBJDZLCBZHYXYZHZFYWXYZYMSDBZZYJGTSMTFXQYXJSCDGSLNMDLRYTZLRYYLXQHTXSRTZCGYXBNQQZFHYKMZJBZYMKBPNLYZPBLMCNQYZZZSJZHJCTZHHYZZJRDYZHNFXGLFXSLKGJTCTSSYLLGZRZBBJZZKLPKBCZYSLXYXBJFPNJZZXCDWXZYJXZZDJJGGGRSRJKMCMZJLSJYWQSHYHQJSXPJZZZLSNSHRNYPJTWCHKLBSRZLCXWJQXQKYSJYCZTLQZYBBYBWZJQDWGYZCYTJCJXCKCWDKKZXSGKDZXWWYYJQYYTCYTDJLXWKCZKKLCCLZCQQDZLQLCSFQCHQHSFSMQZZLLBJJZBSJHTSJDYSJQJPDLZCDCWJKJZZLPYCGMZWDJJBSJQZSYZYHHXCBBJYDSSDDZNCGLQMBTSFCBFDZDLZNFGFJGFSMPTJQLMBLGQCYYXBQKDXJQSRFKZTJDHCZKLBSDZCFYTPLLJGJHTXZCSSZZXSTCYGKGCKGYOQXJPLZBBBGTGYJDGCZQSZLBJLSJFZGKQQJCGYCZBZQTLDXRJXBSXXPZXHYZYCLWDSJJHXMFCZPFZHQHQMQGKSLYHTYCGFRZGNQXCLPDLBZCSCZQLLJBLHBDCYPCZPPDYMTZSGYHCKCPZJGSLCLNSCDSLDZXBMSDLDDFJMKDJDHSLZXLSZQPQPGJLLYBDSZGQLBZLSLKYYHZTTNCJYQTZZFSZQZTLLJTYYLLQLLQYZQLBDZLSLYYZYMDFSZSNHLXZNCZQZBBWSKRFBCYZMTHBLGJPMCZZCSTLXSHTZCYZLZBLFEQHLXFLCJLYLJQCBZLZJGHSSTBRMHXZHJZCLXFNBGXGTQJCZTMSFZKJMSSNXLJKBHSZXNTNLZDNTLMSJXGZJYJCZXYHYHWRWWQNZTNFJSCPZSHZJFYRDJSFSCJZBJFZQZCHZLXFXSBZQLZSGYFTZDCSZXZJBQMSZKJRHXJZCGBJKHCHGTJKJQGLXBXFGDRTYLXJXGDTSJXHJZJJCMZLCQSBTXHQGXTTXHXFTSDKFJHZYJFJXRZCDLLLCQSQQZQWQXSWQTWGWBZCGCLLQZBCLMQQTZGZXZXLJFRMYZFLXYSQXXJKXRMJDCDMMYXBSQBHGCMWFWTGMXLZBYYTGZYCCDXYZXSWGXYJYZNBGPZJCQSYXCXRTFYCGRHZTXSZZTHCBFCLSYXZLJQMZLMPLMXZJSSFLBYSMYQHXJSXRXSQZZZSSLYFLCZJRCRXHHZXQYDSHXSJJHZCXJBDYNSYSXJBQLPXZQPYMLXZKYXLXCJLCYCRXZZLLDLLLSJYHZXGYJWKJRWYHCPSGNRZLFZWFZZNSXGXFLZSXZZZBFCSYJDBRJKRDHHGXJLJJTGXJXXSTJTJXLYXQFCSGSWMSBCTLQZZWLZZKXJMLTMJYHSDDBXGZHDLBMYJFRZFCGCLYJBPMLYSMSXLSZJQQHJZFXGFQFQBPXZGYYQXGZTCQWYLTLGWWGWHLLFSFGZJMGMGBGTJFSYZZGZYZAFLSSPMLBFLCWBJZCLJJMZLPJJLYMQDMYYYFBGYGQZGLYZDXQYXRQQQHSXYYQQYGJTYXFSFSLLGNQCYGYCWFHCCCFXBYLYPLLZQXXXXXKQHHXSHJDCFDSCZJXCPZWHHHHHAPYLHALPQAFYHXDYLLKMZQGGGDDESRNNDLTZGCHYBPYSQJJHCLLJTOLNJPZLJLHYMHEYDYDSQYCDDHGZPNDZCLZYWLLZNTEYTGXLHSLPJJBDGWXPCDNTJCKLKCLWKLLCASSTKNZDNQNTTLYYZSSYSSZZRYLJQKCGBHHCRXRZYDGRGCWCGZHFFFPPJFZYNAKRGYWYQPQXXFKJTSZZXSWZDDFBBQTBGTZFZNPZFPZXZPJSZBMQHKCYXYLDKLJNYPKYGHGDCJXXEAHPNZGCTZCMXCXMMJXNKSZQNMNLWBWWXJJYHCLSTMCSQDJCXXTPCNPDTNNPGLLLZCJLSPBLPLKCDTNJNLYYRSCFFJFQWDPGZDWMNZCCLODAXNSSNYZRESTYJWJYJDBCFXNMWTTBQLWSTSZGYBLJPXGLBOCLGPCBJFTMXZLJYLZXCLTPNCLCGXTFZJSHCRXSFYSZDKNTLBYJCYJLLSTGQCBXNWZXBXKLYLHZLQZLNZCQWGZLGZJNCJGCMNZZGJDZXTZJXYCYYCXXJYYXJJXSSSJSTSSTTPPGHTCSXWZDCSYFPTFBCHFBBLZJCLZZDBXGCXLQPXKFZFLSYLTYWBMNJHSKBMDDBCYSCCLDXYCDDQLYJJHMQLLCSGLJJSYFPYYCCYLTJANTJJPWYCMMGQYYSQDHQMZHSZXPFTWWZQSWQRFKJLXJQQYFBRXJHHFWJGZYQACMYFRHCYYBYQWLPEXCCZSTYRLTSDMQLYKMBBGMYYJPRKNNBBSXYXBHYZDJDNGHPMFSGBWFZMFJMMBCMZZCJJLCNYXYQGMLRYGQCCYHZLWJGCJCGGMCJJFYZZJHYCFRRCMTZQZXHFQGDJXCCJEAQCRJTHPLJLSZDJRBCQHJDZRHXLYXJSYMHZYDWLDFRYHBBYDTSSCCWBXGLPZMLZZTQSSCPJMMXJCSJYTYCGHYCJWSNSXLFEMWJNMKLLSWTXHYYYGCMMCWJDQDJZGLLJWJNKHPZGGFLCCSCZMCBLTBHBQJXQDJPDJQTGHGLFQAWBZYJJLTSTDHQHCTCBCHFLQMPWDSHYYTQWCNZTJTLBYPBPDYYYXSQKXWYYFLXXNCWCXYBMAELYKKJMZZZBRXYAQJFLJPFHHHYTZZXRGQQMHSPGDZJWBWPJHZJDYSCQWZKTHXSQLZYYMYSDZGRXCKKHJLWPYSYSCSYZLRMLQSYLJXBCXTLHDQZPCYCYKPPPNSXFYZJJRCEMHSZMSXLXGLRWGCSTLRSXBYGBZGZTCPLDJLSLYLYMDTMTCPALCXPQJCJWTCYYZLBLXBZLQMYLJBGHDSLSSDMXMBDCZSXWHAMLCZCPJMCNHJYJNSYGCHSKQMZZQDLLKABLWJQSFMOCDXJRRLYQCHJMYBYQLRHETFJZFRFKSRYXFJDWDSXXLWSQJYSLYXWJHSNLXYYXHBHAWHHJCXWMYLJCSQLKYDTTXBZSXFDXGXSJHHSXXYBSSXDPWNCMRPTJZCZENYGCXQFJXKJBDMLJCMQQXLOXSLYXXLYLLJDZBTYMHBFSTTQQWLHOGYBLSCALZXQLHTWRRQHLSTMYPYXJJXMQSJPNBRYXYJLLYQYLTHYLQYFMHKLJDMLLHFZWKZHLJMLHLJKLJSTLQXYLMBHHLNLSXQCHXCFXXLHYHJJGBYZZKBXSCQDJQDSXJZSYHZHHMGSXCSYMXFEBCQWWRBPYYJQTYQCYJHQQZYHMWFFHGZFRJFCDBXNDQYZPCYHHJLFRZGPPXZDBBGZQSTLGDGYLCQMGCHHMFYWLZYXKJLYPQHSYWMQQGQZMLZJNSQXJQSYJTCBEHSXFSSFXZWFLLBCYYJDYTDTHWZSFJMQQYJLMQSXLLDTTKHHYBFPWDYYSQQRNQWLGWDEBDWCYYGCDLKJXTMXMYJSXHYBRWFYMWFRXYQMXYSCTZZTFYKMLDHQDLWYQNLCRYJBLPSXCXYWLSBRRJWXHQYBHTYDNHHGMMYWYTZCSQMTSSCCDALWZTCPQPYJLLQZYJSWXWZZMMGLMXCLMXCZMXMZSQTZPPJQBLPGXJZHFLJJHYCJSNXWCXSCCDLXSYJDCQCXSLQYCLZXLZZXMXQRJMHRHZJPHMFLJLMLCLQNLDXZLLLFYPNGJYSXCQQDCMQJZZXHNPNXZMEKMXXYKYQLXSXTXJXYHWDCWDZHQYYBGYBCYSCFGFSJNZDYZZJZXRZRQJJYMCANHRJTLDBPYZBSTJHXXZYPBDWFGZZRPYMTNGXZQBYXMBBFCCKRJJJBJEGRZGYCLKXZDXKKNSJKCLJSPGYYZLQQJYBZSSQLLLKJFCBKTYLCCCDBLSPPFYLGYDTZJYQGGKQTTFCXBDKDXXHYBBFYTYHBCLPDYTGDHRYRNJSBTCSNYJQHKLLLZSLYDXXWBCJQSBXBFJZJCJDZFBXXBRMLAZGCSNCLBJDSTBLFRZDSWSBXBCLLXXLZDJZSJPYLYXXYFTFFFBHJJJGBYGJPMMMMSSCLJMTLYZJXSWXTYLEDQPJMYGQZJGDJLQJWJQLLSDGJGYGMSCLJJXDTYGJQJQJCJZCJGDZDSHQGSJGGCJHQXSNJLZZBXHSGZXCXYLJXYXYYDFQQJHJFXDHCTXJYRXYSQTJXYEFYYSSYXJXNCYZXFXCSYSZXYYSCHSHXZZZGZZZGFJDLDYLNPZGYJYZYYQZPBXQBDZTZCZYXXYHHSCXSHCGGQHJHGXWSZTMZMEHYXGEBTYLZKKWYTJZRCLEKESTDBCYKQQSAYXCJXWWGSBHJSZSDHCSJKQCXSWXFCTYNYDPZCCZJQTZWJQDZZZQZLJCHLSBHPYDXPSXSHHEZDXFPTJQYZZXHYAXNCFZYYHXGNQMYWXTZSJPKHHGYMXMXQCXTSBCQSJYXHTYYLYBCQLMMSZMJZJLLCOGXZAAJZYHJMCHHCXZSXZDZNLEYJJZJBHZWZZSQTZPSXZTDSXJJJZNYAZPHHYYSRNQDTHZHAYJYJHDZXZLSWCLYBZYECWCYCRYLCXNHZYDZYDYJDFRJJHTRSQTXYXJRJHOJYNXELXSFSFJZGHPZSXZSZDZCQZBYYKLSGSJHCZSHDGQGXYZGXCHXZJWYQWGYHKSSEQZZNDZFKWYSSDCLZSTSYMCDHJXXYWEYXCZAYDMPXMDSXYBSQMJMZJMTZQLPJYQZCGQHXJHHHXXHLHDLDJQSLDWBSXFZZYYSCHTYTYJBHECXHJKGJFXBHYZJFXBWHBDZFYZBCAPNPGNYDMSXHKHHMAMLNBYJTMPXYJMCTHJBZYFCGTYHWPHFTGZZEZSBZEGPBMDSKFTYCMHBLLHGPZJXZJGZJYXZSBBQSCZZLZCCSTPGXMJSFTCCZJZDJXCYBZLFCJSYZFGSZLYBCWZZBYZDZYPSWYJGXZBDSYSXLGZBZFYGCZXBZHZFTPBGZGEJBSTGKDMFHYZZJHZLLZZGJQZLSFDJSSCBZGPDLFZFZSZYZYZSYGCXSNTXCHCZXTZZLJFZGQSQYXZJQCCCCDJCDXZJYQJCCGXZTDLGSCXZSYJJQTCCLQDQZTQCHQQJZTEZZZPBKKDJFCJFZTYBQYQTTYNLMBDKTJCPQZJDZFPJSBNJLGYJDXJDZQKZGQKXCLPZJTCJDQBXDJJJSTCJNXBXCMSLYJCQMTJQWWCJJNJNLLLHJCWQTBZQYCZCZPZZDZYDDCYZDZCCJGTJFZDPRNTCTJDCQTQNDTJNPLZBCLLCTDSXKJZQDPZLBZNBTJDCXFCZDBCCJJLTQJPLDCGZDBBZJCQDCJWYNLLZLZCCDWLLXWZLXRSNTQJCCXKJLSGDFQTDDGLRLAJJTKLYMKQLLDZYTDYYCYGJWYXDXFRSKSTCDENQMRKQZHHQKDLDAZFKYPBGGPZREBZZYKYZSPEGJJGLKQZZZSLYSYWYZWFQZNLZZLZHWCGKYPQGNPGBLPLRRJYXCCCGYHSFZFWBZYWTGZXYLJCZWHXZJZBLFFLGSKHYJZEYJHLPLLLLCYGXDRZELRHGKLZZYHZLYQSZZJZQLJZFLNBHGWLCZCFJWSPYXNLZLXGCCPZBLLCXBBBBXBBCBBCRNNCCCYRBBSYLDCGQYYQXYGMQZWTZYDYJHYFWDEHZDJYWLCCNTZYJJCDEDPZDZTSTQJHDYMBJNYJZLXTSSTPHNDJXXBYXQTZQDDTJTDYZTGWSCSZQFLSHLGLBCJBHDLYZJYCKWTYDYLBNYDSDSYCCTYSZYYEBGEXHQDDWNYGYCLXTDCYSTQMYGZASCCSZZDDLCCLZRQXYYELJSBYMXSHZTEMBBLLYYLLYTDQYSHYMRQXKFKBFXNXSBYCHXBWJYHTQBPBSBWDZYLKGZSKYGHQZJHHXJXGNLJKZLYYCDXLFWFGHLJGJYBXBLYBXQPQGZTZPLNCYBXDJYQYDYMRBESJYYHKXXSTMXRCZZYWXYHYBMCFLYZHQYZMQXDBXBZWZMSLPDMYCKFMZKLZCYJYCCLHXFZLYDQZPZYGYJYZMZXDZFYFYTTQTCHGSPCZMLCCYTZXJCYTJMKSLPZHYSNWLLYTPZCTZZCKTXDHXXTQCYPKSMQCCYYAZHTJPCYLZLYJBJXTFNYLJYYNRXCYLMMNXJSMYBCSYSSLZYLLJJGYLDZDPQBFZZBLFNDSQKCZFHHHGQMRDSXYCSTXNQQJPYJBFCXDYQFBNXEJDGYQBSRCNFYYQPGHYJDYZXGRHTKYLEQDZNTSMGKLBSGBPYSZBYTJZSSZJCSSXZBHBSCSBZCZPTQFZMQFLYPYBBJGSZMXXDJMTHYSKKBJTXHJCEGBSMJYJZCXTMLJYXRZZQSCXXQPTZXMKYXXXJCLJPRMYYGADYSKQLSADHRSKQXZXZTCGHZTLMLWXYBWSYCDBHJHCFCWZSXHYTKZLXQSHLYCZJXEMPLPRCGLTBZZTLZJCYJGDTCLGLPLLQPJMZPAPXYZLAKTKDNCZZBNZCTDQQZJYJGMCTXLTGCSZLMLHBGLKFWNWZHDXPHLFMKYDLGXDTWZFRJEJCTZHYDXYKSHWFZCQSHKTMQQHTCHYMJDJSKHXZJZBZZXYMPAJQMSDBXLSKLYYNWRTSQLSCBPDBSGZWYHTLKSSSWHZZLYYTNXJGMJSZSXFWNLSOZTXGXLSAMMLBWLDSZYLAKQCQCTMYCFJBSLXCLZJCLXXKSBZQCLHJPHQPLSXSCKSLNHPSFQQYTXJJZLQLDXZJJZDYYDJNZPTFCDSKJFSLJHYLZQJZLBTHYDGDJFDBYAZXDZHZJNHHQBYKNXJJQCZMLLJZKSPLDSCLBBLXKLELXJLBJYCXJXGCNLCQPLZLZNJTZLJGYZDZPLTQCSSFDMNYCXGBTJDCZNBGBQYQJWGKFHTNBYQZQGBKPBBYZMTJDYTBLSQMBSXTBNPDXKLEMYYCJYNZDTLDYKZZXDDXHQSHDGMZSJYCCTAYRZLPWLTLKXSLZCGGEXCLFXLKJRTLQJAQZNCMBQDKKCXGLCZJZXJHPTDJJMZQYKQSECQZDSHHADMLZFMMZBGNTJNNLGBYJBRBTMLBYJDZXLCJLPLDLPCQDHLHZLYCBLCXZCJADQLMZMMSSHMYBHBSKKBHRSXXJMXSDZNZPXLBBRAGGGFCHGMSKLLTSJYYCQLCSKYWYEHYWHBHQYWBAWYKQLDQFTNTKHQCGDQKTGPKXHCPDHTWTMSSYHBWCRWXHJMKMZNGWTMLKFGHKJYLDYYCXWHYECLQHKQHTDQHHFFLDXQWGZYYDESBPKYRZPJFYYZJCEQDZZDLATTBBFJLLCXDLMJSDXEGYGSJQXCFBXSSZPDYZCXDNYXPFZYDLYJCCPLTXLSXYZYRXCYYSDYLWWNDSAHJSYGYHGYWKAXTJZDAXYSRLTDJSSAXFNEJDXYZHLXLLLZHZSJNYQYQQXYJGHZGJCYJCHZLYCDSHWSGCZYJXCLLNXZJJYYXNFSMWFPYLCYLLABWDDHWDXJMCXZTZPMLQZHSFHZYNZTLLDYWLSLXHYMMYLMBWWKYXYADTXYLLDJPYBPWFXJMMMLLHAFDLLAFLBHHHBQQJTZJCQJJDJTFFKMMMBYTHYGDCQRDDWRQJXNBYSNMZDBYYTBJHPYBYGTJXAAHGQDQTMYSTQXKBTSBKJLXRBEQQHQMJJBDJWTGTBXPGBKTLGQXJJJCDHXQDWJLWRFMQGWQHCKRYSWGBTGYGBWSDWDWRFHWYTJJXXXJYZYSLPHYYPAYXHYDQKXSHXYXESKQHYWBDDDPPLCJLHQEEWXKSYYHDYPLFJTHKJLTCYYHHJTTPLTZZCDLTHQKCXQYSTEEYWKYZYXXYYSDDJKLLPWMCYHQGXYHCRMBXPLLNQYDQHXSXXWGDQBSHYLLPJJJTHYJKYPHTHYYKTYEZYENMDSHLCRPQFBGFXZBSBTLGXSJBSWYYSKSFLXLPPLBBBLBSFXFYZBSJSSYLPBBFFFFSSCJDSTZSXTRYJCYFFSYTYZBJTBCTSBSDHRTJJBYTCXYJEYLXCBNEBJDSYSYHGSJZBXBYTFZWGENYHHTHJHATFWGCSTBGXKLSTYWMTMBYXJSKZSCDYJRCYTWXZFHMYMCXLZNSDJTTTXRYCFYJSBSDYERXHLJXBBDEYNJGHXGCKGSCYMBLXJMSZNSKGXFBNBBTHFJAAFXYXFPXMYFHDTZCXZZPXRSYWZDLYBBJTYQWQJPZYPZJZNJPZJLZTFYSBTTSLMPTZRTDXQSJEHBZYLZDHLJSQMLHTXTJECXALZZSPKTLZKQQYFSYGYWPCPQFHQHYTQXZKRSGTGSQCZLPTXCDYYZSSQZSLXLZMACBCQBZYXHBSXLZDLTCDJTYLZJYYTPZYLLTXJSJXHLBMYTXCQRBLZSSFJZZTNJYDXMYJHLHPBLCYXQJQQKZZSCPZKSWALQSBLCCZJSXGWWWYGYATJBBCTDKHQHKGTGPBKQYSLBXBBCKBMLLXDZSTBKLGGQKQLSBKKDFXRMDKBFTPZFRTBBMFERQGXKJPZSSTLBZDPSZQZSJTHLJQLZBPMSMMSXLQQNHKNBLRDDNHXDHDDJCYYGYFQGZLGSYGMJQGKHBPMXYXLYTQWLWGCPBMJXCYZYDRJBHTDJXEESHTMJSBYPLWHLZFFNYPMHXQHPLTBQPFBCWJDBYGPNXTBFZJGSDDTJSHXEAWZZYLLTTYBWJKGXGHLFKXDJTMSZSQYNZGGSWQSPHTLSSKMCLZXYSZQZXNCJDQGZDLFNYKLJCJLLZLMZZNHYDSSHTHXZLZZBBHQZWWYCRDHLYQQJBEYFSGXTHSRXWQHWFSLMSSGZTTYEYQQWRSLALHMJTQJSMXQBJJZJXZYZKXBYQXBJXSHZSSFGLXMXZXFGHKZSZGGYLCLSARJXHSLLLMZXELGLXYDJYTLFBHBPNLYZFBBHPTGJKWETZHKJJXZXXGLLJLSTGSHJJYQLQZFKCGNNDJSSZFDBCTWWSEQFHQJBSAQTGYPJLBXBMMYWXGSLZHGLZGNYFLJBYFDJFRGSFMBYZHQFBWJSYFYJJPHZBYYZFFWODGRLMFTMLBZGYCQXCDJYGZYYYYTYTYDWEGAZYHXJLZYTHLRMGRJXZCLHNELJJTHTBWJYBJJBXJJTJTEEKHWSLJPLPSFAZPQQBDLQJJTYYQLYZKDKSQJYYJZLDQCGJJYZJSYCMRAQTHTEJMFCTYHYPKMHYCWJDCFHYYXWSHCTXRLJGJSHCCYYYJLTKTTYTMXGTCJTZAYYOCZLYLBSZYWJYTSJYHBYSHFJLYGJXXTMZYYLTXXYPCLXYJZYZYYPNHMYMDYYLBLHLSYYGQLLNJJYMSOYCBZGDLYXYLCQYXTSZEGXHZGLHWBLJGEYXTWQMAKBPQCGYSHHEGQCMWYYWLJYJHYYZLLJJYLHZYHMGSLJLJXCJJYCLYCJPCPZJZJMMYLCJLNQLJJJLXXJMLSZLJQLYCMMHCFMMFPQQMFXLQMCFFQMMMMHMZNFHHJGTTHHKHSLNCHHYQDXTMMQDCYDYXYQMYQYLDDCYYYDAZDCYMZYDLZFFFMMYCQCWZZMABTBYCTDMNDZGGDFTYPCGQYTTSSFFWBDTZQSSYSTWJJHJYTSXXYLBYQHWWHXEZXWZNNQZJZJJQJCCCHYYXBZXCCYJTLLCQXKNJYCYYCYNZZQYYOEWYCZDCJYCCHYJLBTZKYCQWLPGPYLLGKDLDLGKGQBGYCHJXY####Z#W###Z####S#####L#######SL##Z####LGTM####GD#####################ATN##HBLTDZLATMMBJ#LX";
+const PYX_S="丁Z万M丌Q不F且CJ丞SZ串GQ丿Y乃A乇Z么Y乐Y乘S乙J乜N乾G予Z事Z于WX亏Y亘X些S亟Q亢G亥J亨PX仅FN仇JQ介G从Z仡WY以S仰A仳B件M任L份B仿P伉G伎QZ众Y会K传Z伯M伴P伺S伽JQ佃T但TY位L体BC佗Y余TX佚D佛B佝JK佰M佴N佻DYZ佼X侉EHW侗T侥Y侧Z便P俊DS俏X俞S俟S信S俸B俺Y俾P倍P倘C倚J倜DZ假GX偈Q偕J偬C傀K傍P僧C僭Z僮CZ儋S儿R兄K免W兑R兔C共H其J典T兹C内R冉DN册Z冯P冰N冼S净C凵K凹W划G刨B券X刹C刺Q削QS前J剡Y剥P副P剽B剿C助C劾K勖M募B勺DZ勿M匀J包FP匕P匙C匡W匮G区O匿T半P卑P卒C单CS卜P卞P卟J占T卡Q卤X卵K卷GQ厂AHY厕S厘C厝J厦X厶M参S受D叟X古K句GQ叨T召S叭P可G台SY叱EH叶X号X司C叹Y吁Y吃Q合G吓H吖A吟J吡P否P吧P吨T吩P听Y吭H吱Q吲S吴T吵M吾Y呀X呃A呆AB呈K告J呒M呔T呲Z味M呵AK呷JX呼X咀Z咎G咔N咖GJ咦X咬J咭QX咯KL咳GH咸J哆CZ哇GH哈ST哌G哏HN哐Q哕Y哦E哧HX哨X哩MY哺F哽NY唇Z唑S唔MN唪B唬GX唼Q啁DT啊E啐EZ啜Z啡BP啻D喈X喊JK喋QZ喏R喔W喙Z喜C喝KY喟H喳C嗄SX嗌WY嗑HX嗒T嗔T嘀Z嘁Z嘏J嘘S嘬Z嘲Z嘿M噎S噢AY噫A噱X嚣A嚯X囗G囝NY团Q囤T园W圈J圜Y土CD圣K圩XY圪Y圳CHQ圻Y均Y坏P块Y坨Y坫Z坯H坳Y坷J坻D垂Z垌T垠K垦Y垧J垩S垸H埃Z埏Y埔B埝D埤B埯Y堆Z堇Q堋B堕H堡P堤STW堪C堵Z塌D塔D填CZ墅Y增C壅W声Q壳Q夏J夕Y大T夭W夯B失Y夹G奇AJY奋K奏C契JX奔F奠TZ奥Y女R奸G她CJ妁Y妃P妖J妗X妞H妯C姐XZ姓S姚T姣X姥M姬Y娃G娩W娶JS婕Q婺M媪WY媲B媵S嫖B嬗C孱JZ宁Z它Y宅CD完K宓F宛Y客Q家G容Y宿QX寨QS寰X封B射Y将Q尉Y尚C尢W尥N尾Y尿S屈J屎X屏B属Z屯Z屹G岂K岈X峒T峙S峤Q崎Y崛Y崤Y嵇X嵊C嵌HK嶷N巛S巡SY巨Q差J己Q已S巳Y巷H巽Z币Y市F帑N帕M帘C帱D幅B幢Z干A平B幸N幺M广AY庄P庇P度Z庳P庵EY庶Z廑Q弁P弄L式T弟T弹T强J彀K彖S彗S彡X彦P彭B彳F彷F徙S徵C徼Y忏Q忐K忑D忪Z忮Q忱D忾Q怀F怕B怙T怠Y怫B怵X恁R恂S恃Z恍G恝Q恫T恶W恿T悛X悝L惆DQ惊L惝T惰T惴CG愁JQ愉T愍F感H愠W慊X慎Z慝N憧Z憾D懊Y戆Z戌Q戏H戕Z或Y戚C戛G戡Z房P扁P才Z扒P扛G扭CZ扮FH扰Y扳P扶P找H承Z技Q抄S把P投D抗G折ST抨B抬C抱P抵QZ抻S押JX拂BP担J拈D拊B拌P拍B拓Z拔F拖C拗NY拘G拚BF招QS括G拱J拴Q拼B拽Y拾J挈JS挑D挝Z挟J挫Z捆H捍GX捎QX捐Y捧F捶D捷CQ掀H掇Z掉N掊F掎Y排B掘K探X接CSX控Q措Z掸S掺S掾C揄CS揍C提CDS插Z揖J揞Y握O揣DTZ揩J揭HQ揲SY援H搋Y搛L搜X搞KQ搬S搭T摧Z摺LX撅G撇B撕X撖Q撮Z撰SX擐JX擗B攉Q攒C攘NX支Q敌H敕S敞Z敦TZ敫Q斗Z斜CY斡G斥Z斫C方PW於W施Y旁B旄W族CS无M既X旬J旮X旰H昂Y昆H昔C昙Y昧W是T昵Z晁Z晟JS景Y暇J暖X暧N暴P曝B曷E曾Z最C月R有W朊W服B朐CX朝Z期J札Y术Z朱S机W杂D杓DSZ杜T杭K杷B杼S枇B枉K枋B析S枕C枘N果L枝Q枞Z枯G枸JQ柁T柑Q柙J柚Z柜J柠CZ柢C查Z柴Z柽J栅CS栎Y栓Q栖X栝KT校JQ栩Y核GK格HL桃Z桅G桊Q桐D桔X桧H梏J梢X梧Y梭X棋J棍AH棣T棰D棱C椎Z椹Z楂C楮Z楱C楷J概J榜P槁K槌DZ槛J槭CSZ槽Z槿Q樘C横G橐DL橙D檀S檐D檠J檫S次Z欹Q款X歃X歇Y歙X歹E殁W殍B殖S毋M母W比P毳QX毹Y氏JZ氐Z氽Q汀D汁SX汗G池T汤S汩HY汪H汶M汽GY汾P沆K沈CT沌CTZ沓T沮Z沱CD治C沾CDT泄Y泅Y泊B泌B泔H泖L泞Z泣LS泫J泵LP泷S泺P洋X洒CX洚H洞T洫Y洮DY活G洼G洽H派BM浅J浍K浒X浚CX浩G浸Q涂CY涉D涌C涎DY涓XY涔QZ涡G涪P液S淌C淑C淖CZ淙S淡TY淦H淬Z淳Z混GK渑S渠J渥O温Y渫DQYZ港H渴HJ游L湃B湍Z湔QZ湛CDJSTY湟K湫Q溃H溉X溥BF溪Q溱Z溴C溺R滇TZ滋CX滑G漂B漯T潘BF潢G潭DXY潼CZ澄D澉H澍Z澡C澳Y澶DZ澹ST濂X濞P濡EN濯S瀑B灌H灬H炅G炎T炔QX炕H炖T炮B烛C焘T焦Q焯Z煨Y熙Y熨W燠A燥S燹B爻X爿Q犄Y犍Q犴HJ狂J狄T狠KY狡X狻JX狼H猎QX猓L猗EJW獬HJ獾Q率S王Y玟M玢F瑗H瓠G瓿P甄J甘H甫P甬D甭Q甸STY町DZ畜X番BP畸Q畹Y疋SY疑N疔N疙Y疟Y疴EQ疵JZ疹C痕G痦P痪T瘕X瘟Y瘳L瘵J癌Y百M皇W皋H皖H盅C盍K盒A盛C盯C盹Z盼F盾SY省X眈C眙C眩HJ眭HWX眼W睃J睇T睢HW睫S睽J睾H瞀W瞠Z瞥B瞿J矜GQ矣X石D矸H砉X研X砝GJ砥Z硅H硌L硎K硐LT硝Q硪EY硫C硬G碟S碡Z碣KY碱X磅P磺GK示QZ祁Z祈G祖J祝C祠S祢N祭Z禅S离C种C秘B租J秤P积Z移C税T稞H稠DT稷Z稹B稽Q穴J穹K穿Y窀T窒D窖Z窨Y窬D立W童Z竺D笏W笤S筋Q筒D筠J箐J箢W箬N箴J篦P籴Z粘N粢CJ粥Y粹S精Q糸S系J絮CN繁P繇Z红G纤Q纥H纶G给J缉Q缏P缲S缴Z缺K罱N羡Y羧Z羹L羽H翟Z翮L耆SZ而N耗M耙P耳R耶X耷Z聱Y肄S肆T肋J肜C肢S肥B肩X肫CT肮GH育Z肷X肺P胂C胆T胍H胜QX胝CD胞P胲G胶X胺E能TX脔J脘H脞Q脯F脾B腊X腌A腔K腧Y腱Q膀P膊LP膘P膪Z膻D臧C臭X至D臾K舂Z舄QT舌G舒Y舡X般P艟TZ艮H艴BP艽Q艾Y艿R芋X芍DQX芎X芒HW芘B芟W芥G芦H芩Y芪C芭P芴H苕T苛H苞P苣Q苦GH苫CT苴BCXZ苻P茄Q茇FP茈Z茛J茜X茧C茫H茭QX荃C草Z荑Y荒K荠Q荤X荥Y荨Q荼CSY荽W莆F莉C莘X莜D莞W莠X莩P菀Y菅G菏G菥S菩B菹Z菽J萁J萆P萑Z著C葚S葡B董Z葭X葶D蒡P蒲B蒿G蓁Q蓿S蔓W蔚Y蔡S蔫Y蔽P蕃BP蕈T蕉Q蕊J蕞J蕹Y蕺Q薜P藏Z蘖B蘧J虑B虫H虹GJ虾H蚌FP蚕T蚝C蚣Z蚰Z蚴N蚵K蚺T蛆J蛇CTY蛙J蛞S蛤EG蛩G蛸X蛾Y蜍Y蜒D蜓D蜕Y蜚BP蜡JQZ蜩D蜮G蜱M蜴X蜷J蜻J蜾L蝎H蝙P蝤JY蝥W蝶T螃B螅C螫Z蟠F蠃G蠖Y蠼J行H衰C衿Q袂Y袍B袒Z袜M袢F被P袷Q袼L裒B裢S裨P裳C裴F裼X褊P褚Z褥N褶DX覃QY见X角GL觖GK解X觳JQ訇J詹D许H识Z说Y调T谷LY豉C豚D豫SX貉M贾G赦C赫S赶Q趁NZ趄Q超T越H趑C趟CZ趣CZ足J趵CPZ趼Y趿QS跌T跑B跛P跣S跤Q跬X跳D踅C踔DTZ踢D踣P踩K踱C踹DS蹄D蹊X蹲CQZ蹴JZ蹶G躔Z身J车J轧GZ辗Z辟BM辨P达T还F迤T迦X迭Y追DT适K逄F透S逐DT逗QTZ逛K逞Y造C逡SX逢P逯D逾D遁QX遇O遗W遽Q邑E邓S邢G邪SY邺Q郄X郅J郇X郗C郝S郢C部P郴L鄹J酐H酡D酢Z酮CD醋Z醒CJ醛C醮QZ重CT野S鏖B钭D钯P钿T铅Y铛C铤T铫Y锬X镐H镡TX长C阏Y阚K阮Y阽Y阿E陀D陂P附B降X限W陟D除SZ陴B陶DY隋DT隔JR隗GW隘E隧Z隶DY隹CW雇H雉KSY雩X需NR震S霍S霰S霸P霾L青J靓L革J鞋W鞘S鞠Q鞫Q鞴F颈G颉X颌G颤Z食Y餐S饧X馇Z馗Q馘X馥B驮D骀T骠P骰G骱X骸G髂G髟PS鬲EL鬻JZ魄BT鲑X鲭Z鸟D鹄H鹘H麇Q黹X鼎Z齐J龈Y龟JQ";
+const PYX={};(function(){let k=null;for(const ch of PYX_S){if(ch>='A'&&ch<='Z'){if(k)PYX[k]+=ch;}else{k=ch;PYX[k]='';}}})();
+const _pyOptCache=new Map();
+// 单个字符可能的首字母集合(字符串，主读音在前)；''=应跳过(标点/空白/无读音)
+function pyOpts(ch){
+  let r=_pyOptCache.get(ch);
+  if(r!==undefined)return r;
+  let c=ch.charCodeAt(0),x=ch;
+  if(c>=0xFF01&&c<=0xFF5E){c-=0xFEE0;x=String.fromCharCode(c);}
+  if(c>=0x4E00&&c<=0x9FFF){const p=PYT[c-0x4E00];r=p==='#'?'':p+(PYX[ch]||'');}
+  else if((c>=65&&c<=90)||(c>=48&&c<=57))r=x;
+  else if(c>=97&&c<=122)r=x.toUpperCase();
+  else r='';
+  _pyOptCache.set(ch,r);
+  return r;
+}
+function getPY(char){if(!char)return'#';const o=pyOpts(char);return o?o[0]:'#';}
+// 整串转首字母缩写(主读音，跳过标点空白)，例如"水中花"->"SZH"
+const _initialsCache=new Map();
+function getInitials(str){
+  str=String(str||'');
+  const cached=_initialsCache.get(str);
+  if(cached!==undefined)return cached;
+  let out='';
+  for(const ch of str){const o=pyOpts(ch);if(o)out+=o[0];}
+  _initialsCache.set(str,out);
+  return out;
+}
+// 是否命中：q 逐位命中 str 各字的某个读音首字母(多音字任一读音都算)
+function initialsMatch(str,q){
+  if(!q)return true;
+  q=String(q).toUpperCase();
+  let i=0;
+  for(const ch of String(str||'')){
+    const o=pyOpts(ch);
+    if(!o)continue;
+    if(o.indexOf(q[i])<0)return false;
+    if(++i===q.length)return true;
+  }
+  return false;
+}
+
+// ---- 全屏子页面开关：跟 TV 端 openPF/closePF 同一个「只留一个面板打开」思路 ----
+function openMPage(id){document.querySelectorAll('.mfull').forEach(p=>p.classList.remove('open'));document.getElementById(id).classList.add('open');}
+function closeMPage(id){document.getElementById(id).classList.remove('open');}
+
+// ---- 字母/数字虚拟键盘：跟 TV 端 handleAlpha()/toggleAlphaMode() 同一套
+//      「累积多个字母、按拼音首字母 startsWith 匹配」逻辑 ----
+const alphaState={};
+const alphaFilter={};
+const ALPHA_PLACEHOLDER={od:'歌名搜索',ar:'歌星搜索',hs:'常唱搜索',fv:'收藏搜索'};
+function alphaPanelHTML(prefix){
+  const letters="ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('').map(l=>`<div class="ak" onclick="handleAlpha('${prefix}','${l}')">${l}</div>`).join('')+`<div class="ak ak-clr" onclick="handleAlpha('${prefix}','DEL')">删除</div>`;
+  const nums="1234567890".split('').map(n=>`<div class="ak" onclick="handleAlpha('${prefix}','${n}')">${n}</div>`).join('')+`<div class="ak ak-clr" onclick="handleAlpha('${prefix}','DEL')">删除</div>`;
+  return `<div class="alpha-disp"><span>🔍</span><span class="ad-txt" id="${prefix}-keys-txt">${ALPHA_PLACEHOLDER[prefix]}</span><button class="ak-toggle" id="${prefix}-toggle" onclick="toggleAlphaMode('${prefix}')">123</button></div>
+  <div class="alpha-keys" id="${prefix}-keys">${letters}</div>
+  <div class="alpha-keys" id="${prefix}-keys-num" style="display:none">${nums}</div>`;
+}
+['od','ar','hs','fv'].forEach(p=>{const el=document.getElementById(`${p}-alpha`);if(el)el.innerHTML=alphaPanelHTML(p);});
+function toggleAlphaMode(prefix){
+  const letters=document.getElementById(`${prefix}-keys`);
+  const nums=document.getElementById(`${prefix}-keys-num`);
+  const btn=document.getElementById(`${prefix}-toggle`);
+  if(!letters||!nums||!btn)return;
+  const toNum=letters.style.display!=='none';
+  letters.style.display=toNum?'none':'grid';
+  nums.style.display=toNum?'grid':'none';
+  btn.textContent=toNum?'ABC':'123';
+}
+function resetAlphaKeyboard(prefix){
+  alphaState[prefix]='';
+  const txt=document.getElementById(`${prefix}-keys-txt`);if(txt)txt.textContent=ALPHA_PLACEHOLDER[prefix];
+  const letters=document.getElementById(`${prefix}-keys`),nums=document.getElementById(`${prefix}-keys-num`),btn=document.getElementById(`${prefix}-toggle`);
+  if(letters)letters.style.display='grid';
+  if(nums)nums.style.display='none';
+  if(btn)btn.textContent='123';
+}
+function handleAlpha(prefix,k){
+  const txtEl=document.getElementById(`${prefix}-keys-txt`);
+  if(k==='DEL'){
+    alphaState[prefix]=(alphaState[prefix]||'').slice(0,-1);
+    if(txtEl)txtEl.textContent=alphaState[prefix]||ALPHA_PLACEHOLDER[prefix];
+  }else{
+    alphaState[prefix]=(alphaState[prefix]||'')+k;
+    if(txtEl)txtEl.textContent=alphaState[prefix];
+  }
+  if(alphaFilter[prefix])alphaFilter[prefix]();
+}
+
+// ---- 公共曲库缓存：歌名点歌/分类点歌/最新入库都需要"全量曲库"，只拉一次 ----
+let allSongsCache=[];
+async function ensureAllSongs(){
+  if(!allSongsCache.length)allSongsCache=await fetch('/api/songs').then(r=>r.json());
+  return allSongsCache;
+}
+
+// ---- 1. 歌名点歌 ----
+let filtOrder=[],odPg=0;const ORDER_PG=20;
+alphaState['od']='';
+alphaFilter['od']=()=>{const q=alphaState['od'];filtOrder=!q?[...allSongsCache]:allSongsCache.filter(s=>initialsMatch(s.title,q));odPg=0;renderOrder();};
+async function openOrder(){
+  await ensureAllSongs();
+  filtOrder=[...allSongsCache];odPg=0;
+  resetAlphaKeyboard('od');
+  renderOrder();
+  openMPage('page-order');
+}
+function renderOrder(){
+  const t=Math.ceil(filtOrder.length/ORDER_PG)||1;
+  odPg=Math.max(0,Math.min(t-1,odPg));
+  renderSongsInto(document.getElementById('order-list'),filtOrder.slice(odPg*ORDER_PG,(odPg+1)*ORDER_PG),'没有找到相关歌曲');
+  document.getElementById('order-pg-info').textContent=`${filtOrder.length?odPg+1:1}/${t} (共${filtOrder.length}首)`;
+  document.getElementById('order-prev').disabled=odPg<=0;
+  document.getElementById('order-next').disabled=odPg>=t-1;
+}
+function orderPage(d){const t=Math.ceil(filtOrder.length/ORDER_PG)||1;odPg=Math.max(0,Math.min(t-1,odPg+d));renderOrder();}
+
+// ---- 2. 歌手点歌 ----
+const AV_COLORS=['#ff2255','#ff8c42','#8e44f7','#36a9f7','#00c9a7','#1a4bff','#ff6b6b','#f7366a'];
+let allArtists=[],filtArtists=[],arPg=0;const ARTIST_PG=12,AG_COLS=3;
+alphaState['ar']='';
+alphaFilter['ar']=()=>{const q=alphaState['ar'];filtArtists=!q?[...allArtists]:allArtists.filter(a=>initialsMatch(a.artist,q));arPg=0;renderArtists();};
+function sortArtistsByPinyin(list){
+  list.sort((a,b)=>{
+    const pa=getPY(a.artist.charAt(0)),pb=getPY(b.artist.charAt(0));
+    if(pa!==pb)return pa<pb?-1:1;
+    return a.artist.localeCompare(b.artist,'zh-CN');
+  });
+}
+async function openArtists(){
+  if(!allArtists.length){allArtists=await fetch('/api/artists').then(r=>r.json());sortArtistsByPinyin(allArtists);}
+  filtArtists=[...allArtists];arPg=0;
+  resetAlphaKeyboard('ar');
+  renderArtists();
+  openMPage('page-artists');
+}
+function renderArtists(){
+  const g=document.getElementById('artist-grid');g.innerHTML='';
+  if(!filtArtists.length){g.innerHTML='<div class="mfull-empty" style="grid-column:span 3">没有找到歌手</div>';updateArtistPager();return;}
+  const t=Math.ceil(filtArtists.length/ARTIST_PG)||1;
+  arPg=Math.max(0,Math.min(t-1,arPg));
+  const pageItems=filtArtists.slice(arPg*ARTIST_PG,(arPg+1)*ARTIST_PG);
+  const frag=document.createDocumentFragment();
+  pageItems.forEach((a,i)=>{
+    const c=document.createElement('div');c.className='ag-card';
+    const rowIdx=Math.floor(i/AG_COLS);
+    const avHtml=a.hasAvatar
+      ? `<img class="ag-av" src="/api/singer-avatar/${encodeURIComponent(a.artist)}" alt="" onerror="this.outerHTML='<div class=&quot;ag-av&quot; style=&quot;background:${AV_COLORS[rowIdx%AV_COLORS.length]}&quot;>${a.artist.charAt(0)}</div>'">`
+      : `<div class="ag-av" style="background:${AV_COLORS[rowIdx%AV_COLORS.length]}">${a.artist.charAt(0)}</div>`;
+    c.innerHTML=`${avHtml}<div class="ag-name">${a.artist}</div><div class="ag-cnt">${a.count}首</div>`;
+    c.onclick=()=>openArtistSongs(a.artist);
+    frag.appendChild(c);
+  });
+  g.appendChild(frag);
+  updateArtistPager();
+}
+function updateArtistPager(){
+  const t=Math.ceil(filtArtists.length/ARTIST_PG)||1;
+  document.getElementById('artist-pg-info').textContent=`${filtArtists.length?arPg+1:1}/${t} (共${filtArtists.length}位)`;
+  document.getElementById('artist-prev').disabled=arPg<=0;
+  document.getElementById('artist-next').disabled=arPg>=t-1;
+}
+function artistPage(d){const t=Math.ceil(filtArtists.length/ARTIST_PG)||1;arPg=Math.max(0,Math.min(t-1,arPg+d));renderArtists();}
+
+// ---- 歌手作品（歌手点歌二级页面） ----
+let allArtistSongs=[],asPg=0;const AS_PG=20;
+function openArtistSongs(artist){
+  document.getElementById('as-title').textContent='🎤 '+artist;
+  allArtistSongs=[];asPg=0;renderArtistSongs();
+  openMPage('page-artist-songs');
+  fetch(`/api/songs?artist=${encodeURIComponent(artist)}`).then(r=>r.json()).then(s=>{allArtistSongs=s;asPg=0;renderArtistSongs();});
+}
+function closeArtistSongs(){closeMPage('page-artist-songs');openMPage('page-artists');}
+function renderArtistSongs(){
+  const t=Math.ceil(allArtistSongs.length/AS_PG)||1;
+  asPg=Math.max(0,Math.min(t-1,asPg));
+  renderSongsInto(document.getElementById('as-list'),allArtistSongs.slice(asPg*AS_PG,(asPg+1)*AS_PG),'该歌手暂无歌曲');
+  document.getElementById('as-pg-info').textContent=`${allArtistSongs.length?asPg+1:1}/${t} (共${allArtistSongs.length}首)`;
+  document.getElementById('as-prev').disabled=asPg<=0;
+  document.getElementById('as-next').disabled=asPg>=t-1;
+}
+function artistSongsPage(d){const t=Math.ceil(allArtistSongs.length/AS_PG)||1;asPg=Math.max(0,Math.min(t-1,asPg+d));renderArtistSongs();}
+
+// ---- 3. 分类点歌：语种/风格 chip 从曲库现算，逻辑跟 TV 端 selectCategory()/
+//      clearCategoryDim() 一致——每个维度单选，两个维度之间取交集 ----
+let selLang='',selGenre='',filtCat=[],catPg=0;const CAT_PG=20;
+async function openCategory(){
+  await ensureAllSongs();
+  selLang='';selGenre='';filtCat=[];catPg=0;
+  renderCategoryChips();
+  renderCategory();
+  openMPage('page-category');
+}
+function renderCategoryChips(){
+  const langMap={},genreMap={};
+  allSongsCache.forEach(s=>{
+    const l=(s.language||'').trim();if(l)langMap[l]=(langMap[l]||0)+1;
+    const g=(s.genre||'').trim();if(g)genreMap[g]=(genreMap[g]||0)+1;
+  });
+  const build=(map,type,selVal)=>Object.entries(map).sort((a,b)=>b[1]-a[1]).map(([v,c])=>
+    `<div class="cat-chip${selVal===v?' sel':''}" onclick="selectCategory('${type}','${esc(v)}')">${esc(v)}<span class="cnt">${c}</span></div>`
+  ).join('');
+  const buildAll=(type,selVal)=>`<div class="cat-chip${selVal?'':' sel'}" onclick="clearCategoryDim('${type}')">全部</div>`;
+  const langBox=document.getElementById('cat-lang-list'),genreBox=document.getElementById('cat-genre-list');
+  const langKeys=Object.keys(langMap),genreKeys=Object.keys(genreMap);
+  langBox.innerHTML=langKeys.length?(buildAll('language',selLang)+build(langMap,'language',selLang)):'<div class="cat-empty-tip">曲库还没有语种信息</div>';
+  genreBox.innerHTML=genreKeys.length?(buildAll('genre',selGenre)+build(genreMap,'genre',selGenre)):'<div class="cat-empty-tip">曲库还没有风格信息</div>';
+}
+function selectCategory(type,value){
+  if(type==='language')selLang=(selLang===value?'':value);else selGenre=(selGenre===value?'':value);
+  catPg=0;applyCategoryFilter();renderCategoryChips();renderCategory();
+}
+function clearCategoryDim(type){
+  if(type==='language')selLang='';else selGenre='';
+  catPg=0;applyCategoryFilter();renderCategoryChips();renderCategory();
+}
+function applyCategoryFilter(){
+  if(!selLang&&!selGenre){filtCat=[];return;}
+  filtCat=allSongsCache.filter(s=>{
+    const l=(s.language||'').trim(),g=(s.genre||'').trim();
+    const okLang=!selLang||l===selLang;
+    const okGenre=!selGenre||g===selGenre;
+    return okLang&&okGenre;
+  });
+}
+function renderCategory(){
+  const listEl=document.getElementById('category-list'),pgEl=document.getElementById('category-pg-info');
+  const pager=document.getElementById('category-pager');
+  if(!selLang&&!selGenre){
+    listEl.innerHTML='<div class="mfull-empty">请选择上面一个语种和/或一个风格（比如"国语"+"合唱"）</div>';
+    pgEl.textContent='—';pager.style.display='none';
+    return;
+  }
+  pager.style.display='flex';
+  const t=Math.ceil(filtCat.length/CAT_PG)||1;
+  catPg=Math.max(0,Math.min(t-1,catPg));
+  renderSongsInto(listEl,filtCat.slice(catPg*CAT_PG,(catPg+1)*CAT_PG),'该分类下暂无歌曲');
+  pgEl.textContent=`${filtCat.length?catPg+1:1}/${t} (共${filtCat.length}首)`;
+  document.getElementById('category-prev').disabled=catPg<=0;
+  document.getElementById('category-next').disabled=catPg>=t-1;
+}
+function categoryPage(d){const t=Math.ceil(filtCat.length/CAT_PG)||1;catPg=Math.max(0,Math.min(t-1,catPg+d));renderCategory();}
+
+// ---- 4. 热歌排行 ----
+async function openCharts(){
+  const el=document.getElementById('charts-list');
+  el.innerHTML='<div class="mfull-empty">加载中…</div>';
+  openMPage('page-charts');
+  const songs=(await fetch('/api/charts').then(r=>r.json())).slice(0,20);
+  if(!songs.length){el.innerHTML='<div class="mfull-empty">还没有人唱过歌</div>';return;}
+  el.innerHTML='';
+  songs.forEach((s,i)=>{
+    const d=document.createElement('div');d.className='chart-row';
+    const rk=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
+    d.innerHTML=`<div class="ck ${i<3?'r'+(i+1):''}">${rk}</div><div class="chart-info"><div class="ct">${s.title}</div><div class="cm">${s.artist||'未知歌手'}</div></div><button class="btn-add">＋</button>`;
+    d.querySelector('.btn-add').onclick=()=>addSong(s.id,s.title);
+    el.appendChild(d);
+  });
+}
+
+// ---- 5. 最近唱过（常唱） ----
+let allHist=[],filtHist=[],hsPg=0;const HS_PG=10;
+alphaState['hs']='';
+alphaFilter['hs']=()=>{const q=alphaState['hs'];filtHist=!q?[...allHist]:allHist.filter(s=>initialsMatch(s.title,q));hsPg=0;renderHist();};
+async function openHistory(){
+  allHist=await fetch('/api/history').then(r=>r.json());
+  filtHist=[...allHist];hsPg=0;
+  resetAlphaKeyboard('hs');
+  renderHist();
+  openMPage('page-history');
+}
+function renderHist(){
+  const t=Math.ceil(filtHist.length/HS_PG)||1;
+  hsPg=Math.max(0,Math.min(t-1,hsPg));
+  renderSongsInto(document.getElementById('history-list'),filtHist.slice(hsPg*HS_PG,(hsPg+1)*HS_PG),'还没有唱过歌');
+  document.getElementById('history-pg-info').textContent=`${filtHist.length?hsPg+1:1}/${t} (共${filtHist.length}首)`;
+  document.getElementById('history-prev').disabled=hsPg<=0;
+  document.getElementById('history-next').disabled=hsPg>=t-1;
+}
+function histPage(d){const t=Math.ceil(filtHist.length/HS_PG)||1;hsPg=Math.max(0,Math.min(t-1,hsPg+d));renderHist();}
+
+// ---- 6. 我的收藏 ----
+let allFavList=[],filtFav=[],fvPg=0;const FV_PG=10;
+alphaState['fv']='';
+alphaFilter['fv']=()=>{const q=alphaState['fv'];filtFav=!q?[...allFavList]:allFavList.filter(s=>initialsMatch(s.title,q));fvPg=0;renderFav();};
+async function openFavorites(){
+  allFavList=await fetch(`/api/favorites?device=${getDevId()}`).then(r=>r.json());
+  filtFav=[...allFavList];fvPg=0;
+  resetAlphaKeyboard('fv');
+  renderFav();
+  openMPage('page-favorites');
+}
+function renderFav(){
+  const t=Math.ceil(filtFav.length/FV_PG)||1;
+  fvPg=Math.max(0,Math.min(t-1,fvPg));
+  renderSongsInto(document.getElementById('favorites-list'),filtFav.slice(fvPg*FV_PG,(fvPg+1)*FV_PG),'还没有收藏歌曲');
+  document.getElementById('favorites-pg-info').textContent=`${filtFav.length?fvPg+1:1}/${t} (共${filtFav.length}首)`;
+  document.getElementById('favorites-prev').disabled=fvPg<=0;
+  document.getElementById('favorites-next').disabled=fvPg>=t-1;
+}
+function favPage(d){const t=Math.ceil(filtFav.length/FV_PG)||1;fvPg=Math.max(0,Math.min(t-1,fvPg+d));renderFav();}
+
+// ---- 7. 最新入库：复用"歌名点歌"那份 allSongsCache 缓存按 id 倒序排列——
+//      id 是自增主键，值越大代表越晚扫描入库，不需要额外接口。只取最新
+//      100 首，避免曲库很大时还要翻几十页。 ----
+let newestSorted=[],newestPg=0;const NEWEST_PG=20;
+async function openNewest(){
+  await ensureAllSongs();
+  newestSorted=[...allSongsCache].sort((a,b)=>b.id-a.id).slice(0,100);
+  newestPg=0;
+  renderNewest();
+  openMPage('page-newest');
+}
+function renderNewest(){
+  const el=document.getElementById('newest-list');
+  const pgEl=document.getElementById('newest-pg-info');
+  if(!newestSorted.length){el.innerHTML='<div class="mfull-empty">曲库还是空的</div>';pgEl.textContent='—';return;}
+  const t=Math.ceil(newestSorted.length/NEWEST_PG)||1;
+  newestPg=Math.max(0,Math.min(t-1,newestPg));
+  const songs=newestSorted.slice(newestPg*NEWEST_PG,(newestPg+1)*NEWEST_PG);
+  el.innerHTML='';
+  songs.forEach((s,i)=>{
+    const d=document.createElement('div');d.className='chart-row';
+    d.innerHTML=`<div class="ck">${newestPg*NEWEST_PG+i+1}</div><div class="chart-info"><div class="ct">${s.title}</div><div class="cm">${s.artist||'未知歌手'}</div></div><span class="cp">${[s.language,s.genre].filter(Boolean).join(' · ')||'—'}</span><button class="btn-add">＋</button>`;
+    d.querySelector('.btn-add').onclick=()=>addSong(s.id,s.title);
+    el.appendChild(d);
+  });
+  pgEl.textContent=`${newestPg+1}/${t} (共${newestSorted.length}首)`;
+  document.getElementById('newest-prev').disabled=newestPg<=0;
+  document.getElementById('newest-next').disabled=newestPg>=t-1;
+}
+function newestPage(d){const t=Math.ceil(newestSorted.length/NEWEST_PG)||1;newestPg=Math.max(0,Math.min(t-1,newestPg+d));renderNewest();}
+
+updateSearchView();
+fetch('/api/queue').then(r=>r.json()).then(d=>{queueData=d;onQueue();});
+
+// ===== 白天/夜间主题(左上角按钮) =====
+function applyThemeChip(){
+  var light=document.documentElement.getAttribute('data-theme')==='light';
+  var c=document.getElementById('theme-chip');if(c){c.textContent=light?'☀️':'🌙';c.title=light?'当前：白天（点击切换为夜间）':'当前：夜间（点击切换为白天）';}
+  var m=document.getElementById('meta-theme-color');if(m)m.setAttribute('content',light?'#f2f3fa':'#08081c');
+}
+function toggleTheme(){
+  var light=document.documentElement.getAttribute('data-theme')==='light';
+  var next=light?'dark':'light';
+  document.documentElement.setAttribute('data-theme',next);
+  try{localStorage.setItem('ktv-mobile-theme',next);}catch(e){}
+  applyThemeChip();
+}
+applyThemeChip();
+</script>
+</body>
+</html>

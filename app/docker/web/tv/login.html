@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>潇洒K歌 · 登录</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:#07071a;color:#f4f4ff;
+  font-family:"PingFang SC","Microsoft YaHei",sans-serif;
+  min-height:100vh;display:-webkit-box;display:-webkit-flex;display:flex;-webkit-box-align:center;-webkit-align-items:center;align-items:center;-webkit-box-pack:center;-webkit-justify-content:center;justify-content:center;
+  position:relative;overflow:hidden;
+}
+body::before{
+  content:'';position:fixed;top:0;right:0;bottom:0;left:0;z-index:0;
+  background:radial-gradient(ellipse at 50% -10%, rgba(199,54,247,.16), transparent 55%),
+             radial-gradient(ellipse at 90% 100%, rgba(54,217,247,.12), transparent 50%),
+             #07071a;
+}
+.box{
+  position:relative;z-index:1;
+  background:rgba(16,16,42,.78);border:1px solid rgba(255,255,255,.08);border-radius:20px;
+  padding:40px 36px;width:360px;max-width:88vw;text-align:center;
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+}
+.box h1{
+  font-size:26px;font-weight:900;letter-spacing:1px;margin-bottom:6px;
+  background:linear-gradient(90deg,#36d9f7,#c736f7,#ff4f9b);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.box .sub{color:#8888aa;font-size:13px;margin-bottom:26px;letter-spacing:1px}
+.box input[type=text],.box input[type=password]{
+  width:100%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);
+  border-radius:10px;padding:13px 14px;color:#f4f4ff;font-size:15px;outline:none;margin-bottom:14px;
+}
+.box input:focus{border-color:#c736f7}
+.remember-row{display:flex;align-items:center;gap:8px;margin:2px 2px 18px;font-size:13px;color:#8888aa;text-align:left;user-select:none;cursor:pointer}
+.remember-row input{width:16px;height:16px;accent-color:#c736f7;cursor:pointer}
+.box button{
+  width:100%;padding:13px;border-radius:10px;border:none;font-weight:700;cursor:pointer;
+  background:linear-gradient(135deg,#c736f7,#36d9f7);color:#07071a;font-size:15px;
+}
+.box button:disabled{opacity:.5;cursor:not-allowed}
+#err{color:#ff4f9b;font-size:12px;margin:-4px 0 12px;min-height:14px}
+#no-user-tip{color:#8888aa;font-size:12px;line-height:1.7;margin-top:18px;padding-top:16px;border-top:1px solid rgba(255,255,255,.07);display:none}
+.box h1{background:none;-webkit-background-clip:border-box;background-clip:border-box;color:inherit;margin-bottom:10px}
+.box h1 img{width:min(260px,70%);height:auto;display:block;margin:0 auto;filter:drop-shadow(0 0 14px rgba(199,54,247,.4))}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1><img src="/shared/logo.png" alt="潇洒K歌"></h1>
+  <div class="sub">请输入账号密码进入K歌主页面</div>
+  <input id="username" type="text" placeholder="账号" autocomplete="username" onkeydown="if(isEnter(event))document.getElementById('password').focus()">
+  <input id="password" type="password" placeholder="密码" autocomplete="current-password" onkeydown="if(isEnter(event))doLogin()">
+  <label class="remember-row"><input id="remember" type="checkbox" checked>记住登录（30天内免登录）</label>
+  <div id="err"></div>
+  <button id="login-btn" onclick="doLogin()">进入</button>
+  <div id="no-user-tip">还没有可用的登录账号，请让管理员先在「管理后台 → 用户管理」里创建一个账号。</div>
+</div>
+
+<script>
+// 兼容老电视/机顶盒内置浏览器(老 WebKit/老 Chromium)：
+//  - 不使用 async/await、const/let、箭头函数、模板字符串、URLSearchParams、fetch
+//    (这些只要有一个不被支持，整段脚本都会语法报错、doLogin 根本不存在，
+//     表现就是"点按钮没反应、也没任何提示")；
+//  - 请求统一用 XMLHttpRequest；
+//  - 任何脚本错误都会显示在页面上，方便在盒子上直接看到原因。
+window.onerror = function(msg, url, line){
+  var el = document.getElementById('err');
+  if(el) el.textContent = '页面脚本错误: ' + msg + ' (行' + line + ')';
+  return false;
+};
+
+function isEnter(e){
+  e = e || window.event;
+  return (e.key === 'Enter') || e.keyCode === 13 || e.which === 13;
+}
+
+function getParam(name){
+  var q = location.search.replace(/^\?/, '').split('&');
+  for(var i = 0; i < q.length; i++){
+    var kv = q[i].split('=');
+    if(decodeURIComponent(kv[0] || '') === name){
+      try{ return decodeURIComponent((kv[1] || '').replace(/\+/g, ' ')); }catch(e){ return kv[1] || ''; }
+    }
+  }
+  return '';
+}
+var target = getParam('to') || '/tv/index.html';
+
+// 通用请求：cb(err, status, data)；err 非空表示网络层失败
+function xhrJson(method, url, body, cb){
+  var xhr = new XMLHttpRequest();
+  xhr.open(method, url, true);
+  xhr.timeout = 15000;
+  if(body !== null) xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onreadystatechange = function(){
+    if(xhr.readyState !== 4) return;
+    if(xhr.status === 0){ cb(new Error('network'), 0, null); return; }
+    var data = null;
+    try{ data = JSON.parse(xhr.responseText); }catch(e){ data = null; }
+    cb(null, xhr.status, data);
+  };
+  xhr.ontimeout = function(){ cb(new Error('timeout'), 0, null); };
+  xhr.send(body !== null ? JSON.stringify(body) : null);
+}
+
+function goTarget(){
+  // 用 replace 不在历史记录里留登录页
+  try{ location.replace(target); }catch(e){ location.href = target; }
+}
+
+function checkAlreadyAuthed(){
+  xhrJson('GET', '/api/tv-auth/session', null, function(err, status, d){
+    if(err || !d) return; // 查询失败就留在登录页，不影响正常登录
+    if(d.authed){ goTarget(); return; }
+    if(!d.hasUsers){ document.getElementById('no-user-tip').style.display = 'block'; }
+  });
+}
+checkAlreadyAuthed();
+
+function doLogin(){
+  var username = document.getElementById('username').value.replace(/^\s+|\s+$/g, '');
+  var password = document.getElementById('password').value;
+  var remember = document.getElementById('remember').checked;
+  var errEl = document.getElementById('err');
+  var btn = document.getElementById('login-btn');
+  errEl.textContent = '';
+  if(!username || !password){ errEl.textContent = '请输入账号和密码'; return; }
+  btn.disabled = true;
+  errEl.textContent = '登录中…';
+  xhrJson('POST', '/api/tv-auth/login', { username: username, password: password, remember: remember }, function(err, status, d){
+    if(err){
+      errEl.textContent = err.message === 'timeout' ? '请求超时，请检查网络' : '请求失败，请检查网络或证书(https)';
+      btn.disabled = false;
+      return;
+    }
+    if(status >= 200 && status < 300){
+      errEl.textContent = '登录成功，正在跳转…';
+      goTarget();
+      return;
+    }
+    errEl.textContent = (d && d.error) || ('登录失败(HTTP ' + status + ')，请重试');
+    btn.disabled = false;
+  });
+}
+</script>
+</body>
+</html>

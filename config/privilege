@@ -1,0 +1,5 @@
+{
+    "defaults":{"run-as":"package"},
+    "username": "docker-xiaosa-ktv",
+    "groupname": "docker-xiaosa-ktv"
+}

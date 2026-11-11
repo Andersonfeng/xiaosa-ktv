@@ -1,0 +1,14 @@
+appname                    = xiaosa-ktv
+display_name               = 潇洒K歌
+desc                       = 局域网K歌系统，手机扫码点歌，电视/投影仪全屏播放，支持本地/网盘混合曲库、歌手头像与多房间；管理员密码通过 ADMIN_PASSWORD 环境变量配置，应用数据与曲库统一存储于应用默认共享目录
+arch                       = x86_64, aarch64
+source                     = thirdparty
+maintainer                 = XiaosaKTV
+distributor                = XiaosaKTV
+desktop_uidir              = ui
+desktop_applaunchname      = xiaosa-ktv.TV端
+version                    = 1.3.1
+platform                   = 
+checkport                  = false
+disable_authorization_path = false
+checksum                   = f3695843a8f53ebbd94f2bb82f5c3e9c

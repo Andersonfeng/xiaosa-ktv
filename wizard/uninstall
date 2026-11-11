@@ -1,0 +1,17 @@
+[
+    {
+        "stepTitle": "卸载潇洒K歌",
+        "items": [
+            {
+                "type": "tips",
+                "helpText": "卸载将移除应用本身以及对应的 Docker 镜像和容器。应用数据（歌单、封面、缓存等）默认会保留在 /vol1/@appshare/xiaosa-ktv/data，不受此向导影响；MV 曲库在 mv、网盘曲库在 mv-net、歌手头像在 singer，默认也都会保留。如果不再需要本地 MV 曲库，可以打开下面的开关一并清空 mv 目录（mv-net / singer 不会被清空，需要时请手动删除）。"
+            },
+            {
+                "type": "switch",
+                "field": "wizard_clear_mv",
+                "label": "同时清空本地 MV 曲库（mv 目录）",
+                "initValue": "false"
+            }
+        ]
+    }
+]

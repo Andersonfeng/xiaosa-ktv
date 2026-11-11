@@ -1,0 +1,16 @@
+#!/bin/bash
+source "$(dirname "$0")/lib_settings.sh"
+
+# 应用数据 / 曲库目录统一固定使用应用默认共享目录
+# /vol1/@appshare/${TRIM_APPNAME} 下的 data、mv、mv-net、singer 四个子目录
+# （对应 config/resource 中声明的 xiaosa-ktv/* 共享）。这里提前 mkdir 一次，
+# 避免共享目录尚未创建完成时 docker compose 首次启动挂载报错。
+mkdir -p "$(default_data_path)"
+mkdir -p "$(default_mv_path)"
+mkdir -p "$(default_mv_net_path)"
+mkdir -p "$(default_singer_path)"
+
+# 端口固定 8083；管理员密码由 docker-compose.yml 的 ADMIN_PASSWORD 环境变量
+# 定义（默认 admin888），不再走安装向导收集，也不需要写进 SQLite。
+
+exit 0
