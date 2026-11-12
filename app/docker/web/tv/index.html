@@ -874,7 +874,7 @@ html[data-layout="mobile"] #next-up-track span{font-size:16px}
 /* 字幕：浏览器原生 cue 样式在电视上偏小，放大并加半透明底 */
 video::cue{font-size:30px;color:#ffe066;background:rgba(0,0,0,.55);text-shadow:0 2px 4px rgba(0,0,0,.9)}
 /* ASS 逐字卡拉OK字幕：HTML 覆盖层，跟随视频区域，逐字从白色填充成已唱颜色 */
-#ktv-subtitle-layer{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:hidden;display:none}
+#ktv-subtitle-layer{position:absolute;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:2;overflow:hidden;display:none}
 #ktv-subtitle-layer.fs{position:fixed;z-index:51}
 .kara-line{position:absolute;white-space:pre-wrap;line-height:1.18;font-weight:700;will-change:color;max-width:96%}
 .kara-line .kara-seg{white-space:pre-wrap}
@@ -1668,7 +1668,7 @@ html[data-layout="mobile"] .song-list-2col{grid-template-columns:1fr}
 .logo{background:none !important;-webkit-background-clip:border-box !important;background-clip:border-box !important;color:inherit !important;display:flex;align-items:center}
 .logo-img{height:38px;width:auto;display:block;filter:drop-shadow(0 0 8px rgba(199,54,247,.35))}
 .idle-big{background:none !important;-webkit-background-clip:border-box !important;background-clip:border-box !important;color:inherit !important}
-.idle-big img{width:min(380px,60%);height:auto;display:block;margin:0 auto 6px;filter:drop-shadow(0 0 18px rgba(199,54,247,.4))}
+.idle-big img{width:60%;max-width:380px;height:auto;display:block;margin:0 auto 6px;filter:drop-shadow(0 0 18px rgba(199,54,247,.4))}
 #s3-mv-slot .idle-big img{width:150px}
 </style>
 </head>

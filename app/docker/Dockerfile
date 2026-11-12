@@ -6,7 +6,7 @@ FROM node:20-bookworm-slim
 #   - curl / xz-utils：下载并解压带 NVENC 的 FFmpeg（仅 amd64）
 #   - libva2 / libva-drm2 / va-driver-all / vainfo：Intel/AMD 核显 VAAPI 硬解硬编
 #
-# 说明：这是 1.3.1 的构建方式。amd64 额外安装一份带 NVENC 的 FFmpeg 到
+# 说明：这是 1.0.0 的构建方式。amd64 额外安装一份带 NVENC 的 FFmpeg 到
 # /usr/local/bin/ffmpeg-nvenc、ffprobe-nvenc；没有 NVIDIA 显卡或 arm64 时
 # 代码会自动回退到系统 ffmpeg / 软件编码。
 RUN apt-get update && apt-get install -y \
@@ -15,13 +15,14 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/* \
     && ARCH="$(dpkg --print-architecture)" \
     && if [ "$ARCH" = "amd64" ]; then \
-         curl -fsSL -o /tmp/ffmpeg.tar.xz \
-           "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linux64-gpl.tar.xz" \
-         && mkdir -p /tmp/ffmpeg-extract \
-         && tar -xJf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg-extract --strip-components=1 \
-         && install -m 0755 /tmp/ffmpeg-extract/bin/ffmpeg /usr/local/bin/ffmpeg-nvenc \
-         && install -m 0755 /tmp/ffmpeg-extract/bin/ffprobe /usr/local/bin/ffprobe-nvenc \
-         && rm -rf /tmp/ffmpeg.tar.xz /tmp/ffmpeg-extract ; \
+         ( curl -fsSL -o /tmp/ffmpeg.tar.xz \
+             "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linux64-gpl.tar.xz" \
+           && mkdir -p /tmp/ffmpeg-extract \
+           && tar -xJf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg-extract --strip-components=1 \
+           && install -m 0755 /tmp/ffmpeg-extract/bin/ffmpeg /usr/local/bin/ffmpeg-nvenc \
+           && install -m 0755 /tmp/ffmpeg-extract/bin/ffprobe /usr/local/bin/ffprobe-nvenc \
+           && rm -rf /tmp/ffmpeg.tar.xz /tmp/ffmpeg-extract ) \
+         || echo "WARN: NVENC 版 FFmpeg 下载失败，跳过安装；运行时自动回退系统 ffmpeg（软件编码）" ; \
        fi
 
 WORKDIR /app

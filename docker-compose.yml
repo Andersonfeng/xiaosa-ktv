@@ -1,0 +1,54 @@
+# 潇洒K歌 · 通用 Docker Compose（从本仓库源码构建并启动）
+#
+#   第一次启动：cp .env.example .env  →  改 ADMIN_PASSWORD  →  docker compose up -d --build
+#   查看日志：  docker compose logs -f
+#   停止：      docker compose down
+#
+# 所有路径/端口/密码都可以在 .env 里覆盖，见 .env.example。
+
+services:
+  xiaosa-ktv:
+    build:
+      context: ./app/docker
+      dockerfile: Dockerfile
+    image: xiaosa-ktv:1.0.0
+    container_name: xiaosa-ktv
+    restart: unless-stopped
+    ports:
+      # 宿主机端口:容器端口（容器内固定 8080）
+      - "${KTV_PORT:-8083}:8080"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      PORT: "8080"
+      DATA_DIR: /data
+      MV_DIR: /mv
+      MV_DIR_NET: /mv-net
+      SINGER_DIR: /singer
+      SOURCE_CACHE_DIR: /data/source-cache
+      # 管理后台密码：改 .env，不要改这里
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin888}
+      # HLS 转码缓存保留天数（超过且最近没人点唱就自动清理）
+      HLS_CACHE_MAX_AGE_DAYS: ${HLS_CACHE_MAX_AGE_DAYS:-3}
+      # 核显硬件转码用的渲染节点；宿主机没有 /dev/dri 时代码会自动回退软件编码
+      VAAPI_DEVICE: /dev/dri/renderD128
+    volumes:
+      # 应用数据：数据库 ktv.db、封面、HLS 转码缓存 —— 必须持久化
+      - "${KTV_DATA_DIR:-./ktv-data/data}:/data"
+      # 本地曲库：把 MV 文件直接放进来（或让 .env 指向已有的曲库目录）
+      - "${KTV_MV_DIR:-./ktv-data/mv}:/mv"
+      # 网盘 / 网络曲库（可选，不用可以留空目录）
+      - "${KTV_MV_NET_DIR:-./ktv-data/mv-net}:/mv-net"
+      # 歌手头像（可选，文件名 = 歌手名，如 周杰伦.jpg）
+      - "${KTV_SINGER_DIR:-./ktv-data/singer}:/singer"
+    # ------------------------------------------------------------------
+    # 硬件转码（可选）：宿主机有 /dev/dri（Intel/AMD 核显）时才取消注释。
+    # 没有这个设备却保留 devices 段，docker compose up 会直接报错退出。
+    # ------------------------------------------------------------------
+    # devices:
+    #   - /dev/dri:/dev/dri
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get({host:'127.0.0.1',port:8080,path:'/api/discover'},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

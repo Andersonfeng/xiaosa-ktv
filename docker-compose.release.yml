@@ -1,0 +1,42 @@
+# 潇洒K歌 · 只跑镜像（不需要源码构建）
+#
+# 适用场景：镜像已经上传到 Docker Hub / 私有仓库，或者用 `docker save` 拷到目标机器后
+# 用 `docker load` 导入。目标机器只要这一个文件 + .env 就能启动：
+#
+#   docker compose -f docker-compose.release.yml up -d
+#
+# 换镜像：在 .env 里设置 KTV_IMAGE=你的仓库/镜像:tag，或不改文件直接
+#   KTV_IMAGE=andersonfeng/xiaosa-ktv:1.2.0 docker compose -f docker-compose.release.yml up -d
+
+services:
+  xiaosa-ktv:
+    image: ${KTV_IMAGE:-andersonfeng/xiaosa-ktv:1.2.0}
+    container_name: xiaosa-ktv
+    restart: unless-stopped
+    ports:
+      - "${KTV_PORT:-8083}:8080"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      PORT: "8080"
+      DATA_DIR: /data
+      MV_DIR: /mv
+      MV_DIR_NET: /mv-net
+      SINGER_DIR: /singer
+      SOURCE_CACHE_DIR: /data/source-cache
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin888}
+      HLS_CACHE_MAX_AGE_DAYS: ${HLS_CACHE_MAX_AGE_DAYS:-3}
+      VAAPI_DEVICE: /dev/dri/renderD128
+    volumes:
+      - "${KTV_DATA_DIR:-./ktv-data/data}:/data"
+      - "${KTV_MV_DIR:-./ktv-data/mv}:/mv"
+      - "${KTV_MV_NET_DIR:-./ktv-data/mv-net}:/mv-net"
+      - "${KTV_SINGER_DIR:-./ktv-data/singer}:/singer"
+    # 硬件转码（可选）：宿主机有 /dev/dri 时取消下面两行注释
+    # devices:
+    #   - /dev/dri:/dev/dri
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get({host:'127.0.0.1',port:8080,path:'/api/discover'},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

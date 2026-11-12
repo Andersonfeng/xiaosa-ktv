@@ -555,9 +555,15 @@ app.delete('/api/admin/tv-users/:id', requireAdminAuth, (req, res) => {
 // 后面的 express.static 处理)。用 302 重定向而不是直接在这里 res.send
 // 登录页 HTML，是为了让浏览器地址栏、以及登录成功后"回跳到刚才想看的
 // 页面"这件事都能用标准的 URL 跳转完成，不需要额外写一套前端路由逻辑。
-app.get(['/tv', '/tv/', '/tv/index.html', '/tv/clean.html'], (req, res, next) => {
+//
+// /tv_old 是给老电视盒子（Chrome/52 这类内核）用的兼容版页面：功能与 /tv
+// 相同，只是 JS 转译到 ES5、CSS Grid 换成 flex。它同样需要 TV 登录。
+app.get(['/tv', '/tv/', '/tv/index.html', '/tv/clean.html',
+    '/tv_old', '/tv_old/', '/tv_old/index.html'], (req, res, next) => {
   if (isTvAuthed(req)) return next();
-  const to = req.path === '/tv' || req.path === '/tv/' ? '/tv/index.html' : req.path;
+  let to = req.path;
+  if (to === '/tv' || to === '/tv/') to = '/tv/index.html';
+  else if (to === '/tv_old' || to === '/tv_old/') to = '/tv_old/index.html';
   res.redirect(`/tv/login.html?to=${encodeURIComponent(to)}`);
 });
 
@@ -570,6 +576,8 @@ app.get(['/tv', '/tv/', '/tv/index.html', '/tv/clean.html'], (req, res, next) =>
 // 自动 next() 交给下面对应的路由处理，不会互相冲突。
 app.use('/',      express.static(path.join(__dirname, '../web/home')));
 app.use('/tv',    express.static(path.join(__dirname, '../web/tv')));
+// 老内核兼容版电视页（/tv_old）：单文件页面，功能与 /tv 相同。
+app.use('/tv_old', express.static(path.join(__dirname, '../web/tv_old')));
 app.use('/m',     express.static(path.join(__dirname, '../web/mobile')));
 // /mobile 是 /m 的别名，两个路径指向同一份手机点歌页面，纯粹是因为
 // "/mobile" 更直观、容易记，"/m" 更短、原来的二维码/收藏链接可能已经在用，

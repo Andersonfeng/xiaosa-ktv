@@ -17,7 +17,7 @@
 - **曲库管理**：支持本地目录与网盘挂载目录混合曲库，后台可视化管理来源、批量清理孤儿曲目、文件名智能解析、歌手头像自动匹配、多歌手分隔符可配置（默认 `&`，可在后台「设置 → 多歌手」切换）
 - **硬件转码**：自动探测并使用 VAAPI（Intel/AMD 核显）或 NVENC（NVIDIA 显卡）硬件加速转码，无对应硬件时自动回退软件编码
 - **管理后台**：曲库来源管理、终端设备管理、转码缓存清理策略配置，全部网页端可视化操作
-- **电视 APK**：提供电视盒子/投影仪安装包，WebView 加载网页大屏端；首次启动自动搜索同网段 KTV 服务，支持遥控器方向键/OK/返回/菜单操作
+- **电视 APK**：提供电视盒子/投影仪安装包，WebView 加载网页大屏端；首次启动自动搜索同网段 KTV 服务，原生登录 + 遥控器屏幕键盘，支持方向键/OK/返回/菜单操作
 
 ---
 
@@ -28,97 +28,156 @@
 | 大屏播放主页面 | `/tv` | 电视/投影仪打开，K歌主界面 |
 | 手机遥控端 | `/m` | 手机扫码打开，点歌与遥控 |
 | 管理后台 | `/admin` | 曲库、设备、缓存等后台管理 |
-| 电视 APK | `潇洒K歌-TV播放端-v1.0.0.apk` | 电视盒子/投影仪安装，WebView 加载 `/tv`，自动发现服务器 |
+| 电视 APK | `潇洒K歌-TV播放端-v1.2.0.apk` | 电视盒子/投影仪安装，WebView 加载 `/tv`；老内核自动切 `/tv_old` 兼容页，原生登录 + 自动发现服务器 |
+| 老内核兼容大屏页 | `/tv_old` | 给 Chrome/52 这类老电视盒子用的兼容版，功能同 `/tv`，由 APK 自动选择 |
 
 浏览器打开服务器地址（如 `http://局域网IP:8083`）会看到一个导航首页，三个入口一目了然。
 
 ### 电视盒子 / 投影仪 APK
 
-如果不想用电视浏览器，可以直接安装 `潇洒K歌-TV播放端-v1.0.0.apk`：
+如果不想用电视浏览器，可以直接安装 `潇洒K歌-TV播放端-v1.2.0.apk`：
 
-- 首次启动自动扫描同网段 8083 端口的 KTV 服务；也可以手动输入 `http://服务器IP:8083`。
-- 遥控器：方向键移动焦点，OK 确认；返回键先关闭网页弹层，再弹出「继续观看 / 服务器设置 / 退出」；菜单键直接打开服务器设置。
-- 首次登录使用网页登录页，电视盒子的系统输入法会弹出；如果遥控器没有输入法，可插 USB 键盘完成一次登录，之后会记住。
-- APK 要求 Android 5.1+，建议 WebView 70+；HLS 和二维码库已随服务端本地提供，局域网内不依赖公网 CDN。
+- 首次启动自动扫描本机网段的 8083 端口，并显示本机 IP / 网关；本机网段找不到时会再扩大搜索 `192.168.0/1`、`10.0.0` 等常见网段。仍找不到可手动输入 `http://服务器IP:8083`。
+- 登录改成 **APK 原生登录页**，不再依赖电视盒子的网页登录页和系统输入法：自带遥控器屏幕键盘，方向键选字、OK 输入。老盒子也能登录。
+- 遥控器：方向键移动焦点，OK 确认；返回键先关闭网页弹层，再弹出「继续观看 / 服务器设置 / 退出」；菜单键打开服务器设置 / 屏幕键盘。
+- APK 要求 Android 5.1+；系统 WebView **< Chrome/60** 时自动加载兼容页 `/tv_old`（功能同 `/tv`，JS 已转译、CSS Grid 换成 flex），**>=60** 加载完整 `/tv`。Chrome/52 的老盒子不用再折腾 WebView；如果兼容页也跑不起来，会显示当前版本和升级建议。
+- HLS 和二维码库随服务端本地提供，局域网内不依赖公网 CDN。
 - 源码在 `android-player/`，重新构建见 `android-player/README.md`。
 
 
 ---
 
-## 🚀 快速开始
+## 🚀 快速开始（Docker）
 
-只需 Docker，无需手动安装 Node.js / ffmpeg 等依赖。
+只需要 Docker 20.10+ / Compose v2，不用在宿主机装 Node.js、ffmpeg 或数据库；镜像里已经带好 Node.js 20 + ffmpeg。
 
-### 1. 准备 `docker-compose.yaml`
-
-```yaml
-services:
-  xiaosa-ktv:
-    image: Andersonfeng/xiaosa-ktv:latest
-    container_name: xiaosa-ktv
-    restart: unless-stopped
-    ports:
-      - "8083:8080"          # 访问端口：http://局域网IP:8083
-    environment:
-      - TZ=Asia/Shanghai
-      - PORT=8080
-      - DATA_DIR=/data
-      - ADMIN_PASSWORD=admin888          # 管理后台("/admin")登录密码，记得改掉
-      - VAAPI_DEVICE=/dev/dri/renderD128 # 核显硬件转码用，没有核显就删掉这行
-      - HLS_CACHE_MAX_AGE_DAYS=3         # 转码缓存超过几天没人点就自动清理
-      # 用 NVIDIA 显卡转码(NVENC)就取消下面两行注释，同时取消最下面 runtime: nvidia 的注释
-      # - NVIDIA_VISIBLE_DEVICES=all
-      # - NVIDIA_DRIVER_CAPABILITIES=compute,video,utility
-    volumes:
-      - /path/to/your/data:/data                 # 应用数据(数据库、封面等)，必须挂载
-
-      # 曲库挂载：按需增删，本地曲库挂到 /mv/<自定义名>，网盘曲库挂到 /mv-net/<自定义名>
-      - /path/to/local/library1:/mv/library1
-      - /path/to/local/library2:/mv/library2
-      - /path/to/netdisk/library:/mv-net/netdisk1
-      - /path/to/singer/avatars:/singer           # 歌手头像目录，图片名对应歌手名，如 周杰伦.jpg
-      # 挂载完成后，还需要去后台「曲库管理→曲库来源」里把新目录逐个启用，才会真正参与扫描
-    devices:
-      - /dev/dri:/dev/dri     # 核显硬件转码用，没有核显就删掉这行
-    # runtime: nvidia         # 用 NVIDIA 显卡转码时取消注释(同时打开上面两行 NVIDIA 环境变量)
-```
-
-
-### 2. 启动
+### 1. 准备配置
 
 ```bash
-docker compose up -d
+git clone https://github.com/Andersonfeng/xiaosa-ktv.git
+cd xiaosa-ktv
+
+cp .env.example .env
+mkdir -p ktv-data/{data,mv,mv-net,singer}
 ```
+
+`.env` 里至少改这两项：
+
+```ini
+KTV_PORT=8083                     # 宿主机访问端口
+ADMIN_PASSWORD=换成你自己的密码     # 管理后台 /admin 的登录密码
+```
+
+MV 已经放在宿主机某个目录的话，把 `KTV_MV_DIR` 指过去（例如 `KTV_MV_DIR=/mnt/disk/mv`）；不指就用仓库下的 `./ktv-data/mv`。仓库根目录的 `docker-compose.yml` 已经把这些都参数化了，不用再手写 compose。
+
+> Windows PowerShell 里没有 `mkdir -p`，用 `mkdir ktv-data\data, ktv-data\mv, ktv-data\mv-net, ktv-data\singer` 代替。
+
+### 2. 构建并启动
+
+```bash
+docker compose up -d --build
+```
+
+首次构建约 3~10 分钟（安装 ffmpeg 等系统依赖 + npm 依赖）。amd64 上还会从 GitHub 额外下载一份带 NVENC 的 ffmpeg，网络不通时会自动跳过并回退到系统 ffmpeg，不影响启动，只是 NVIDIA 硬编码不可用。
+
 
 ### 3. 访问
 
-浏览器打开 `http://局域网IP:8083`，或直接访问 `/tv`（大屏）、`/m`（手机点歌）、`/admin`（管理后台）。
+浏览器打开 `http://<服务器IP>:8083`：
 
-### 4. 曲库配置
+| 端 | 地址 |
+|---|---|
+| 导航首页 | `/` |
+| 大屏播放 | `/tv` |
+| 手机点歌 | `/m` 或 `/mobile` |
+| 管理后台 | `/admin`（密码 = `.env` 里的 `ADMIN_PASSWORD`） |
 
-进入「管理后台 → 曲库管理」，将挂载进容器的目录逐个启用为曲库来源，保存后即会自动扫描曲库，无需重建容器。
+首次使用：进 `/admin` 建一个 TV 登录账号（`/tv` 需要登录）；MV 文件放进 `KTV_MV_DIR` 后，到「曲库管理 → 曲库来源」确认目录已启用并点一次扫描。
 
-### 5. 从本仓库源码构建（可选）
-
-本仓库已经包含 1.0.0 的完整 `server/` 和 `web/` 源码，也可以不走 Docker Hub，直接构建：
+### 4. 常用命令
 
 ```bash
-cd app/docker
-# 该 compose 使用 fnOS 固定共享目录；其它环境先按实际路径修改 volumes
-mkdir -p /vol1/@appshare/xiaosa-ktv/{data,mv,mv-net,singer}
-docker compose build --no-cache
-docker compose up -d
+docker compose logs -f        # 看日志
+docker compose restart        # 重启（改完 .env 需要）
+docker compose down           # 停止并删除容器（数据在宿主机上，不会丢）
+docker compose up -d --build  # 更新代码后重建
+docker compose ps             # 状态，Up (healthy) 表示健康检查通过
 ```
 
-构建前请把 `app/docker/docker-compose.yml` 里的 `ADMIN_PASSWORD=admin888` 改掉；没有 `/dev/dri` 的机器需要删掉 `devices` 段（fnOS 安装/升级脚本会自动处理）。
+所有持久化数据都在 `./ktv-data` 下：`data/`（ktv.db、封面、HLS 缓存）、`mv/`、`mv-net/`、`singer/`。备份这个目录就够了，删容器/重建都不会丢歌。
+
+### 5. 部署到远端机器
+
+**A. 直接用已发布的镜像（最快，推荐）**
+
+`andersonfeng/xiaosa-ktv:1.2.0`（amd64，约 570MB）已经发布在 Docker Hub，目标机器只要 `docker-compose.release.yml` + `.env`：
+
+```bash
+docker pull andersonfeng/xiaosa-ktv:1.2.0
+docker compose -f docker-compose.release.yml up -d
+```
+
+**B. 目标机器能拿到源码**（内网 Git、直接拷贝仓库都行；`data/`、`node_modules/` 不用拷）：
+
+```bash
+cd xiaosa-ktv
+cp .env.example .env      # 改密码、端口、曲库路径
+docker compose up -d --build
+```
+
+**C. 用 GitHub Actions 自动构建（本机不用装 Docker）**
+
+`.github/workflows/docker-publish.yml` 已经配好：push 到 `main`/`master` 或打 `v1.2.0` 这样的 tag，GitHub 会自动构建 amd64 镜像并推到 **ghcr.io/andersonfeng/xiaosa-ktv**，不需要额外配置密钥（用仓库自带的 `GITHUB_TOKEN`）。
+
+推上去之后，目标机器（只要 `docker-compose.release.yml` + `.env`）：
+
+```ini
+# .env
+KTV_IMAGE=ghcr.io/andersonfeng/xiaosa-ktv:latest
+```
+
+```bash
+docker compose -f docker-compose.release.yml up -d
+```
+
+> 仓库是私有的话，目标机要先 `docker login ghcr.io` 并给 GitHub 账号发一个 `read:packages` 的 Personal Access Token。公开仓库不用登录。
+
+**C. 手动构建并推送镜像**（本机/服务器上装了 Docker）：
+
+```bash
+docker build -t andersonfeng/xiaosa-ktv:1.2.0 ./app/docker
+docker push andersonfeng/xiaosa-ktv:1.2.0        # 需要先 docker login
+```
+
+目标机器只要 `docker-compose.release.yml` + `.env` 两个文件：
+
+```bash
+docker compose -f docker-compose.release.yml up -d
+```
+
+没有镜像仓库时可以离线搬运：
+
+```bash
+docker save xiaosa-ktv:1.0.0 -o xiaosa-ktv.tar    # 构建机
+docker load -i xiaosa-ktv.tar                      # 目标机
+# 在目标机 .env 里加一行 KTV_IMAGE=xiaosa-ktv:1.0.0，然后
+docker compose -f docker-compose.release.yml up -d
+```
+
+> release 文件里的镜像名默认是 `andersonfeng/xiaosa-ktv:1.2.0`，可用 `.env` 的 `KTV_IMAGE` 覆盖。
+
+### 6. fnOS / 群晖等套件安装
+
+应用包走的是另一份 `app/docker/docker-compose.yml`（固定使用 `/vol1/@appshare/xiaosa-ktv` 共享目录），和上面的通用部署互相独立；安装/升级脚本会自动处理 `devices` 段，不需要手动改。
 
 ---
 
 ## ⚙️ 硬件转码
 
-- **Intel / AMD 核显**：挂载 `/dev/dri` 设备节点即可自动启用 VAAPI 硬件转码
+- **Intel / AMD 核显**：宿主机有 `/dev/dri` 时，把 `docker-compose.yml`（或 release 文件）里 `devices:` 两行的注释去掉，即可自动启用 VAAPI 硬解硬编
 - **NVIDIA 显卡**：需安装 [nvidia-container-toolkit](https://github.com/NVIDIA/nvidia-container-toolkit)，并在 compose 中启用 `runtime: nvidia`
 - 无对应硬件时自动回退到 CPU 软件转码，不影响正常使用
+- 没有 `/dev/dri` 却保留 `devices` 段时 `docker compose up` 会直接报错退出，所以默认是注释掉的
 
 ---
 

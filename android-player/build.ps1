@@ -33,7 +33,8 @@ $keystoreDir = Join-Path $Root "keystore"
 $keystore = Join-Path $keystoreDir "xiaosa-release.jks"
 $storePass = "xiaosa123"
 $keyAlias = "xiaosa"
-$version = "1.0.0"
+$version = "1.2.0"
+$versionCode = 4
 $outName = "潇洒K歌-TV播放端-v$version.apk"
 
 if (Test-Path $build) { Remove-Item -Recurse -Force $build }
@@ -61,8 +62,17 @@ $linkArgs = @(
 if ($LASTEXITCODE -ne 0) { throw "aapt2 link 失败" }
 
 Write-Host "==> javac"
-& $javac -encoding UTF-8 -source 1.8 -target 1.8 -bootclasspath $AndroidJar -d $classes (Join-Path $Root "src\com\xiaosa\ktv\MainActivity.java")
-if ($LASTEXITCODE -ne 0) { throw "javac 失败" }
+$javaSources = @(Get-ChildItem (Join-Path $Root "src") -Recurse -Filter *.java | ForEach-Object { $_.FullName })
+if ($javaSources.Count -eq 0) { throw "src 下没有 .java 文件" }
+# javac 对 deprecated API 会往 stderr 打一条 note；PowerShell 的 Stop 模式
+# 会把原生程序的 stderr 当成异常，导致明明编译成功却中断。这里临时放宽，
+# 编译结果仍然用 $LASTEXITCODE 严格判断。
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+& $javac -encoding UTF-8 -source 1.8 -target 1.8 -bootclasspath $AndroidJar -d $classes @javaSources
+$javacExit = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+if ($javacExit -ne 0) { throw "javac 失败" }
 
 Write-Host "==> d8"
 $classesJar = Join-Path $build "classes.jar"
