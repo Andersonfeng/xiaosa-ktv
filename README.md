@@ -127,7 +127,7 @@ docker compose up -d --build
 
 **C. 用 GitHub Actions 自动构建（本机不用装 Docker）**
 
-`.github/workflows/docker-publish.yml` 已经配好：push 到 `main`/`master` 或打 `v1.2.0` 这样的 tag，GitHub 会自动构建 amd64 镜像并推到 **ghcr.io/andersonfeng/xiaosa-ktv**，不需要额外配置密钥（用仓库自带的 `GITHUB_TOKEN`）。
+`.github/workflows/docker-publish.yml` 已经配好：push 到 `main`/`master` 或打 `v1.3.2` 这样的 tag，GitHub 会自动构建 amd64 镜像并推到 **ghcr.io/andersonfeng/xiaosa-ktv**，不需要额外配置密钥（用仓库自带的 `GITHUB_TOKEN`）。
 
 推上去之后，目标机器（只要 `docker-compose.release.yml` + `.env`）：
 

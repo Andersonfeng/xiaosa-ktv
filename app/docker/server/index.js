@@ -17,6 +17,7 @@ const log = require('./logger');
 const { getArtistSeparator, setArtistSeparator } = require('./artist-settings');
 const { DEFAULT_ARTIST_SEPARATOR, normalizeArtistSeparator } = require('./artist-utils');
 const { probeSubtitleSources, detectSidecarEncoding } = require('./subtitles');
+const { resolveQueueNickname, autoNickname } = require('./autoNick');
 
 // ---------- 进程级兜底：单个后台任务的意外错误不该拖垮整个服务 ----------
 // Bug修复("容器无限重启")的教训：ensureHLS() 后台转码那条 Promise 链之前
@@ -2444,12 +2445,25 @@ app.get('/api/admin/songs/:id/track-preview', requireAdminAuth, async (req, res)
 // (不带 X-Room/?room= 时是默认房间)，队列/历史只读写本房间的数据。
 app.get('/api/queue', roomScope, (req, res) => res.json(getQueueWithSongs(req.room.id)));
 
+// 没填昵称时的兜底名字（"13号麦霸"这类按客户端 IP 生成的名字）见
+// server/autoNick.js —— 单独抽成模块是为了让本地预览代理也能复用同一份逻辑。
+
+// 告诉前端"你不填昵称的话会叫什么"：这个名字是按客户端 IP 在服务端算出来的，
+// 浏览器自己算不出来（JS 拿不到本机的局域网 IP），所以必须问一次服务端。
+// 手机端拿它填昵称输入框的 placeholder，点歌人就知道自己会以什么名字出现在
+// 队列里。只读、不写库、不需要登录，跟下面点歌时用的是同一个 autoNickname()，
+// 两边不会出现"提示一个名字、实际叫另一个名字"。
+app.get('/api/nickname', (req, res) => {
+  res.json({ nickname: autoNickname(req) });
+});
+
 app.post('/api/queue', roomScope, (req, res) => {
   const roomId = req.room.id;
-  const { song_id, nickname } = req.body;
+  const { song_id } = req.body || {};
   const song = db.prepare('SELECT * FROM songs WHERE id=?').get(song_id);
   if (!song) return res.status(404).json({ error: '歌曲不存在' });
-  const info = db.prepare('INSERT INTO queue (song_id,nickname,room_id) VALUES (?,?,?)').run(song_id, nickname || '匿名歌手', roomId);
+  const nickname = resolveQueueNickname(req);
+  const info = db.prepare('INSERT INTO queue (song_id,nickname,room_id) VALUES (?,?,?)').run(song_id, nickname, roomId);
   db.prepare('UPDATE songs SET play_count=play_count+1 WHERE id=?').run(song_id);
   const playing = db.prepare("SELECT * FROM queue WHERE status='playing' AND room_id=?").get(roomId);
   if (!playing) {
@@ -2472,7 +2486,9 @@ app.post('/api/queue', roomScope, (req, res) => {
   // 窗口可能发生变化(比如队列本来是空的，这首歌直接变成"正在播放")，
   // 触发一次预热调度，提前转码+读时长，不等待其完成即可返回响应。
   schedulePreload();
-  res.json({ ok: true, id: info.lastInsertRowid });
+  // 顺手把最终用的昵称回给前端：手机端点歌后 toast 里能显示"以 13号麦霸 的身份
+  // 加入"，用户才知道自己没填名字时系统给了什么名字（老客户端忽略这个字段即可）。
+  res.json({ ok: true, id: info.lastInsertRowid, nickname });
 
   // 需求(网盘STRM支持)：STRM 曲目在扫描阶段完全没有被探测过(audio_tracks
   // 还是 NULL)，第一次被点歌加入队列，才是"这首歌真的要被播放"的信号——

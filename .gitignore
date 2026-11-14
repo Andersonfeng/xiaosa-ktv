@@ -1,0 +1,36 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# 构建产物 / 打包工具
+*.fpk
+fnpack
+fnpack-*
+
+# 系统/编辑器杂项
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# 运行时数据（本地测试容器落盘的数据库、封面、HLS缓存等，不应入库）
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Android 构建临时目录
+.tools/
+android-player/build/
+
+# Docker 部署：运行时数据（数据库/曲库/HLS 缓存）与本地配置（含密码）
+ktv-data/
+.env
+
+# 本地前端预览代理（.tmppreview/preview-proxy.js）及其 npm 缓存：
+# 只是开发时把仓库里的页面转发到真实服务端用，不属于运行时产物
+.tmppreview/
+
+# 输入法/第三方程序偶尔往仓库根目录写的调试日志
+debug.log

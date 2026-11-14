@@ -230,8 +230,10 @@ header{
 #toast{
   position:fixed;left:50%;top:16px;transform:translateX(-50%) translateY(-70px);
   background:#fff;color:#111;padding:9px 18px;border-radius:12px;
-  font-size:13px;z-index:50;transition:.25s;box-shadow:0 10px 30px rgba(0,0,0,.25)
-}
+  font-size:13px;z-index:50;transition:.25s;box-shadow:0 10px 30px rgba(0,0,0,.25);
+  /* 点歌成功的提示里现在会带自动生成的名字(如"13号曲库保管员")，窄屏上
+     可能超过一屏宽：限制最大宽度并允许折行，避免文字被屏幕两边切掉 */
+  max-width:calc(100vw - 32px);text-align:center;line-height:1.45;word-break:break-word}
 #toast.show{transform:translateX(-50%) translateY(0)}
 
 /* ===== 点歌入口 HUB（歌名/歌手/分类/热歌/最近/收藏/最新入库，跟 TV 端同一套
@@ -356,7 +358,7 @@ header{
     <input id="search-input" placeholder="搜索歌名 / 歌手">
   </div>
   <div class="nickname-row">
-    <input id="nickname-input" placeholder="点歌昵称（可选）">
+    <input id="nickname-input" placeholder="点歌昵称（不填自动起名）">
   </div>
 
   <div class="tabs">
@@ -577,6 +579,16 @@ const searchInput = document.getElementById('search-input');
 const nicknameInput = document.getElementById('nickname-input');
 nicknameInput.value = localStorage.getItem('ktv_nick') || '';
 nicknameInput.addEventListener('change', ()=>localStorage.setItem('ktv_nick', nicknameInput.value));
+// 点歌人看不到自己的昵称：不填名字时服务端会按客户端 IP 自动起名(见
+// server/autoNick.js)，但这个名字浏览器算不出来(JS 拿不到本机的局域网 IP)，
+// 所以问一次接口，把"你当前会被叫作什么"显示在 placeholder 上。
+// 老服务端没有这个接口时 fetch 会失败，静默忽略、保留默认文案，不影响点歌。
+(async ()=>{
+  try{
+    const d=await fetch('/api/nickname').then(r=>r.json());
+    if(d&&d.nickname) nicknameInput.placeholder=`点歌昵称（不填自动起名，您当前是 ${d.nickname}）`;
+  }catch(e){}
+})();
 
 // ===== Tabs =====
 function switchTab(name, el){
@@ -778,7 +790,18 @@ function onQueue(){
 // 异步探测每首歌时长(见 server/queuePreload.js)，探测完成后通过 WebSocket
 // 广播新队列。探测还没完成/失败时 q.duration 是 null，不显示这一截，避免
 // 出现"0:00"这种误导性假时长。
-function qDurLabel(q){return (q.duration!=null&&isFinite(q.duration))?` · ${Math.floor(q.duration/60)}:${String(Math.floor(q.duration%60)).padStart(2,'0')}`:'';}
+//
+// 需求(点歌列表显示时长)：曲库列表(歌名点歌/歌手作品/分类点歌/热歌排行/
+// 最近唱过/我的收藏/最新入库)也要在歌手名后面显示时长，跟已点队列共用
+// durText() 这一份格式化逻辑，保证两端写法一致("3:45")。
+// 时长只读 songs.duration，本次不新增任何主动探测：服务端只有在歌进入
+// "已点队列预热窗口"时才会异步 ffprobe 回填(见 server/queuePreload.js)，
+// 所以曲库里没被点过的歌 duration 还是 NULL——这种情况整段不显示、不占位，
+// 不显示"0:00"这种假时长；歌手为空时也不会留下前导的" · "。
+function durText(d){d=Number(d);return (d>0&&isFinite(d))?`${Math.floor(d/60)}:${String(Math.floor(d%60)).padStart(2,'0')}`:'';}
+function qDurLabel(q){const t=durText(q.duration);return t?` · ${t}`:'';}
+// 把"歌手 · 时长"拼成一行，任一段为空时自动省掉多余的分隔符。
+function songMeta(a,d){return [a||'',durText(d)].filter(Boolean).join(' · ');}
 function renderQueue(){
   const el=document.getElementById('tab-queue');
   el.innerHTML='';
@@ -870,7 +893,7 @@ function renderSongsInto(el,list,emptyText){
     const favKey='fav_'+s.id;
     const isFaved=localStorage.getItem(favKey)==='1';
     c.innerHTML=`
-      <div class="info"><div class="title">${s.title}</div><div class="artist">${s.artist||''}</div></div>
+      <div class="info"><div class="title">${s.title}</div><div class="artist">${songMeta(s.artist,s.duration)}</div></div>
       <div style="display:flex;gap:6px;align-items:center">
         <button class="btn-fav${isFaved?' faved':''}">❤</button>
         <button class="btn-add">＋</button>
@@ -882,9 +905,15 @@ function renderSongsInto(el,list,emptyText){
   el.appendChild(frag);
 }
 async function addSong(id, title){
-  const nick=nicknameInput.value.trim()||'匿名歌手';
-  await fetch('/api/queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({song_id:id,nickname:nick})});
-  showToast(`《${title}》已加入队列 🎶`);
+  // 昵称留空就交给服务端按客户端 IP 自动起名(如"13号麦霸")，不再在前端写死
+  // "匿名歌手"——那样服务端永远收不到空值，兜底逻辑就没机会生效。
+  const nick=nicknameInput.value.trim();
+  const res=await fetch('/api/queue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({song_id:id,nickname:nick})});
+  // 服务端会把最终昵称回传(没填名字时是自动生成的)，toast 里带出来让用户知道
+  // 自己在这台大屏上叫什么；拿不到(老服务端)就退回原来的提示。
+  let who='';
+  try{const d=await res.json();who=d&&d.nickname?` · ${d.nickname}`:'';}catch(e){}
+  showToast(`《${title}》已加入队列${who} 🎶`);
 }
 
 function getDevId(){
@@ -1180,7 +1209,7 @@ async function openCharts(){
   songs.forEach((s,i)=>{
     const d=document.createElement('div');d.className='chart-row';
     const rk=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
-    d.innerHTML=`<div class="ck ${i<3?'r'+(i+1):''}">${rk}</div><div class="chart-info"><div class="ct">${s.title}</div><div class="cm">${s.artist||'未知歌手'}</div></div><button class="btn-add">＋</button>`;
+    d.innerHTML=`<div class="ck ${i<3?'r'+(i+1):''}">${rk}</div><div class="chart-info"><div class="ct">${s.title}</div><div class="cm">${songMeta(s.artist||'未知歌手',s.duration)}</div></div><button class="btn-add">＋</button>`;
     d.querySelector('.btn-add').onclick=()=>addSong(s.id,s.title);
     el.appendChild(d);
   });
@@ -1249,7 +1278,7 @@ function renderNewest(){
   el.innerHTML='';
   songs.forEach((s,i)=>{
     const d=document.createElement('div');d.className='chart-row';
-    d.innerHTML=`<div class="ck">${newestPg*NEWEST_PG+i+1}</div><div class="chart-info"><div class="ct">${s.title}</div><div class="cm">${s.artist||'未知歌手'}</div></div><span class="cp">${[s.language,s.genre].filter(Boolean).join(' · ')||'—'}</span><button class="btn-add">＋</button>`;
+    d.innerHTML=`<div class="ck">${newestPg*NEWEST_PG+i+1}</div><div class="chart-info"><div class="ct">${s.title}</div><div class="cm">${songMeta(s.artist||'未知歌手',s.duration)}</div></div><span class="cp">${[s.language,s.genre].filter(Boolean).join(' · ')||'—'}</span><button class="btn-add">＋</button>`;
     d.querySelector('.btn-add').onclick=()=>addSong(s.id,s.title);
     el.appendChild(d);
   });

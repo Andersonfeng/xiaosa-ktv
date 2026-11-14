@@ -3702,6 +3702,14 @@ function fmt(s){return`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2
 // 还没完成/探测失败时 q.duration 是 null，直接不显示这一截，不占位、不显示
 // "0:00"这种误导性的假时长。
 function qDurLabel(q){return (q.duration!=null&&isFinite(q.duration))?` · ${fmt(q.duration)}`:'';}
+// 需求(点歌列表显示时长)：曲库列表(歌名点歌/歌手作品/分类点歌/热歌排行/
+// 最近唱过/我的收藏/最新入库)在歌手名后面显示歌曲时长，格式跟已点队列的
+// qDurLabel() 一致("3:45")。时长只读 songs.duration，这里不做任何主动探测：
+// 服务端只在歌进入"已点队列预热窗口"时才异步 ffprobe 回填(见
+// server/queuePreload.js)，曲库里没被点过的歌 duration 还是 NULL——这种情况
+// 整段不显示、不占位，不显示"0:00"这种假时长；歌手为空时也不会留下前导的
+// " · "。
+function songMeta(a,d){const t=(d>0&&isFinite(d))?fmt(d):'';return [a||'',t].filter(Boolean).join(' · ');}
 // 需求(多终端播放进度同步)：拖动进度条要能在任意控制端操作、全局同步
 // 生效，不能再像以前一样只允许本机(播放端)直接改 video.currentTime——
 // 控制端根本没有 <video> 在播放，没有本地时间轴可改。统一改成"计算出
@@ -4609,7 +4617,7 @@ function renderSongs(el,songs){
     const fk='fav_'+s.id,isFaved=localStorage.getItem(fk)==='1';
     const d=document.createElement('div');d.className='so-row';
     d.innerHTML=`<div class="so-num">${i+1}</div>
-      <div class="so-info"><div class="so-t">${s.title}</div><div class="so-a">${s.artist||''}</div></div>
+      <div class="so-info"><div class="so-t">${s.title}</div><div class="so-a">${songMeta(s.artist,s.duration)}</div></div>
       <div class="so-acts">
         <button class="btn-fav${isFaved?' faved':''}" data-f onclick="toggleFav(${s.id},this)">❤</button>
         <button class="btn-add" data-f onclick="addSong(${s.id},'${esc(s.title)}')">点歌</button>
@@ -4624,7 +4632,7 @@ async function addSong(id,title){await fetch('/api/queue',{method:'POST',headers
 function loadQueue(){const el=document.getElementById('pl-queue');el.innerHTML='';const visibleQueue=queueData.filter(q=>!q.is_autoplay);if(!visibleQueue.length){el.innerHTML='<div style="color:#555;text-align:center;padding:30px">暂无点歌</div>';return;}visibleQueue.forEach((q,i)=>{const d=document.createElement('div');d.className='qr-row'+(q.status==='playing'?' qrp':'');d.innerHTML=`<div class="qr-num">${q.status==='playing'?'♪':i+1}</div><div class="qr-info"><div class="qr-t">${q.title}</div><div class="qr-m">${q.artist||''} · ${q.nickname}${qDurLabel(q)}${q.status==='playing'?' <span style="color:var(--ac)">播放中</span>':''}</div></div><div class="qr-acts">${q.status!=='playing'?`<button class="ma ma-top" data-f onclick="topQ(${q.queue_id})">置顶</button>`:''}<button class="ma ma-del" data-f onclick="delQ(${q.queue_id})">✕</button></div>`;el.appendChild(d);});}
 async function topQ(id){await fetch(`/api/queue/${id}/top`,{method:'POST'});}
 async function delQ(id){await fetch(`/api/queue/${id}`,{method:'DELETE'});}
-async function loadCharts(){const el=document.getElementById('pl-charts');el.innerHTML='';const songs=(await fetch('/api/charts').then(r=>r.json())).slice(0,20);if(!songs.length){el.innerHTML='<div style="color:#555;text-align:center;padding:30px">还没有人唱过歌</div>';return;}songs.forEach((s,i)=>{const d=document.createElement('div');d.className='chart-row';const rk=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;d.innerHTML=`<div class="ck ${i<3?'r'+(i+1):''}"> ${rk}</div><div class="chart-info"><div class="ct">${s.title}</div><div class="cm">${s.artist||'未知歌手'}</div></div><button class="btn-add" data-f onclick="addSong(${s.id},'${esc(s.title)}')">点歌</button>`;el.appendChild(d);});}
+async function loadCharts(){const el=document.getElementById('pl-charts');el.innerHTML='';const songs=(await fetch('/api/charts').then(r=>r.json())).slice(0,20);if(!songs.length){el.innerHTML='<div style="color:#555;text-align:center;padding:30px">还没有人唱过歌</div>';return;}songs.forEach((s,i)=>{const d=document.createElement('div');d.className='chart-row';const rk=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;d.innerHTML=`<div class="ck ${i<3?'r'+(i+1):''}"> ${rk}</div><div class="chart-info"><div class="ct">${s.title}</div><div class="cm">${songMeta(s.artist||'未知歌手',s.duration)}</div></div><button class="btn-add" data-f onclick="addSong(${s.id},'${esc(s.title)}')">点歌</button>`;el.appendChild(d);});}
 // 最新入库：直接复用"歌名点歌"那份 allSongs 缓存按 id 倒序排列——
 // id 是自增主键，值越大代表越晚被扫描入库，不需要额外接口/额外字段。
 // 需求：改成左右两栏、每栏10首后，每页实际展示的是 10行×2栏=20首，
@@ -4649,7 +4657,7 @@ function renderNewest(){
   el.innerHTML='';
   songs.forEach((s,i)=>{
     const d=document.createElement('div');d.className='chart-row';
-    d.innerHTML=`<div class="ck">${newestPg*NEWEST_PG+i+1}</div><div class="chart-info"><div class="ct">${s.title}</div><div class="cm">${s.artist||'未知歌手'}</div></div><span class="cp">${[s.language,s.genre].filter(Boolean).join(' · ')||'—'}</span><button class="btn-add" data-f onclick="addSong(${s.id},'${esc(s.title)}')">点歌</button>`;
+    d.innerHTML=`<div class="ck">${newestPg*NEWEST_PG+i+1}</div><div class="chart-info"><div class="ct">${s.title}</div><div class="cm">${songMeta(s.artist||'未知歌手',s.duration)}</div></div><span class="cp">${[s.language,s.genre].filter(Boolean).join(' · ')||'—'}</span><button class="btn-add" data-f onclick="addSong(${s.id},'${esc(s.title)}')">点歌</button>`;
     el.appendChild(d);
   });
   if(pgEl)pgEl.textContent=`${newestPg+1}/${t} (共${newestSorted.length}首)`;

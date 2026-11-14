@@ -1,0 +1,71 @@
+# 自动构建并推送 Docker 镜像到 GitHub Container Registry (ghcr.io)
+#
+# 触发方式：
+#   - push 到 main / master：构建 amd64 镜像，打 latest 和分支标签
+#   - push 形如 v1.0.0 的 tag：额外打 1.0.0 / 1.0 语义化版本标签
+#   - 也可以在 Actions 页面手动 Run workflow
+#
+# 产物：ghcr.io/andersonfeng/xiaosa-ktv:<tag>
+# 远端机器只要 `docker compose -f docker-compose.release.yml up -d`，
+# 并在 .env 里写 KTV_IMAGE=ghcr.io/andersonfeng/xiaosa-ktv:latest 即可。
+
+name: Build and push image
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+env:
+  # 必须全小写：镜像仓库名不允许大写字母
+  IMAGE_NAME: ghcr.io/andersonfeng/xiaosa-ktv
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 需要构建 arm64 时再打开下面这行（会慢很多：better-sqlite3 要在 QEMU 里编译）
+      # - name: Set up QEMU
+      #   uses: docker/setup-qemu-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract tags / labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./app/docker
+          file: ./app/docker/Dockerfile
+          # 需要 arm64（群晖/树莓派等）就改成：linux/amd64,linux/arm64
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
