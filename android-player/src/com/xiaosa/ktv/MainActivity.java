@@ -1163,10 +1163,14 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         serverInput.setHint("http://192.168.1.100:8083");
         serverInput.setHintTextColor(0xFF555577);
         serverInput.setTextColor(0xFFF4F4FF);
-        serverInput.setTextSize(17);
+        // 1.2.2：地址可能很长，输入框放不下时以前是截掉后半段（域名/端口看不见，
+        // 等于盲打）。改成超出时省略号出现在左边、永远能看到末尾的
+        // “xxx.example.com:8083”这一截，配合下面键盘弹窗里的两行完整预览。
+        serverInput.setTextSize(19);
+        serverInput.setEllipsize(android.text.TextUtils.TruncateAt.START);
         serverInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         serverInput.setImeOptions(EditorInfo.IME_ACTION_GO);
-        serverInput.setPadding(dp(16), dp(10), dp(16), dp(10));
+        serverInput.setPadding(dp(16), dp(12), dp(16), dp(12));
         GradientDrawable inputNormal = roundRect(0xFF0B0B1E, 12, 0x33FFFFFF);
         GradientDrawable inputFocused = roundRect(0xFF0B0B1E, 12, 0xFF36D9F7);
         inputFocused.setStroke(dp(2), 0xFF36D9F7);
@@ -1179,12 +1183,12 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
             serverInput.setShowSoftInputOnFocus(false);
         }
         card.addView(serverInput, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(54)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(64)));
 
         TextView hint = new TextView(this);
         hint.setText(isTouch
                 ? "可填 IP 或域名，不带端口默认 8083；例如 http://192.168.1.100:8083、http://ktv.local:8083"
-                : "可填 IP 或域名，不带端口默认 8083。选中地址框按 OK 打开屏幕键盘，点标题行的「字母」可切换成完整键盘输域名。");
+                : "可填 IP 或域名，不带端口默认 8083。选中地址框按 OK 打开屏幕键盘，第一行就是数字，字母在下面几行。");
         hint.setTextColor(0xFF666688);
         hint.setTextSize(12);
         hint.setPadding(dp(2), dp(6), 0, dp(8));
@@ -1356,16 +1360,18 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         }
         kbMode = MODE_IP;
         kbTarget = serverInput;
-        // 第四个参数 true：标题行给一个「字母 / 123」切换按钮。
-        // 只给数字键盘的话，ktv.example.com、nas.local 这类域名根本输不进来。
-        ipKeyboard = new TvKeyboard(this, this, true, true);
+        // numeric=false：一套「数字+字母」布局，第一行就有 0-9，不用再切纯数字；
+        // bigKeys=true：按键和字号放大，电视上看得清、遥控器也好瞄准。
+        ipKeyboard = new TvKeyboard(this, this, false, true);
         ipKeyboard.refresh();
 
         final Dialog d = new Dialog(this);
         d.requestWindowFeature(Window.FEATURE_NO_TITLE);
         FrameLayout wrap = new FrameLayout(this);
         int screenW = getResources().getDisplayMetrics().widthPixels;
-        int panelW = Math.min(screenW - dp(32), dp(420));
+        // 1.2.2：弹窗原来最宽 420dp，在 1080p 电视上只占三分之一屏，键小到看不清。
+        // 现在最多占满 980dp / 屏幕宽度减 48dp，10 列键盘每个键约 90dp 宽。
+        int panelW = Math.min(screenW - dp(48), dp(980));
         FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(panelW,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);

@@ -47,31 +47,28 @@ final class TvKeyboard {
     private final LinearLayout panel;
     private TextView labelView;
     private TextView valueView;
-    private LinearLayout body;
-    private Button layoutBtn;
     private final List<Button> letterKeys = new ArrayList<>();
     private Button firstKey;
     private boolean shift;
-    /** 当前是不是数字键盘布局。服务器地址输入框允许在"数字/字母"之间来回切。 */
+    /** 当前是不是数字键盘布局。 */
     private boolean numeric;
-    /** 是否在标题行给一个「字母 / 123」切换按钮（只有服务器地址输入需要）。 */
-    private final boolean allowLayout;
+    /** 大按键模式：电视上专门给"服务器地址"用，键和字都放大一圈。 */
+    private final boolean bigKeys;
 
     TvKeyboard(Context context, Host host, boolean numeric) {
         this(context, host, numeric, false);
     }
 
     /**
-     * @param allowLayout true 时标题行多一个「字母 / 123」按钮，能在数字键盘和
-     *                    完整键盘之间切换。服务器地址除了 192.168.1.10 这种 IP，
-     *                    也可能是 ktv.example.com / nas.local 这类域名，纯数字
-     *                    键盘根本敲不进去（1.2.1 修复）。
+     * @param bigKeys true 时所有按键和字号放大（约 1.5 倍高、1.3 倍字），
+     *                专给电视上的服务器地址输入用——原来的键 42dp 高，
+     *                在 3 米外看几乎没法用遥控器瞄准。
      */
-    TvKeyboard(Context context, Host host, boolean numeric, boolean allowLayout) {
+    TvKeyboard(Context context, Host host, boolean numeric, boolean bigKeys) {
         this.ctx = context;
         this.host = host;
         this.numeric = numeric;
-        this.allowLayout = allowLayout;
+        this.bigKeys = bigKeys;
         this.panel = build();
     }
 
@@ -122,10 +119,15 @@ final class TvKeyboard {
 
         valueView = new TextView(ctx);
         valueView.setTextColor(0xFF36D9F7);
-        valueView.setTextSize(15);
+        valueView.setTextSize(bigKeys ? 24 : 15);
         valueView.setTypeface(Typeface.DEFAULT_BOLD);
-        valueView.setSingleLine(true);
-        valueView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        // 地址可能很长（http://my-nas-at-home.example.com:8083 这种），
+        // 原来单行 + 末尾省略号，打字时只能看到开头 → 用户说的"盲打"。
+        // 改成最多两行、不省略，实在超长就整体折行，至少能看见自己在敲什么。
+        valueView.setSingleLine(false);
+        valueView.setMaxLines(2);
+        valueView.setEllipsize(null);
+        valueView.setHorizontallyScrolling(false);
         valueView.setPadding(dp(10), 0, dp(10), 0);
         header.addView(valueView, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
 
@@ -140,26 +142,13 @@ final class TvKeyboard {
             header.addView(switchBtn, slp);
         }
 
-        Button closeBtn = makeKey(numeric ? "取消" : "收起", 13, dp(34), false);
+        Button closeBtn = makeKey(numeric || bigKeys ? "取消" : "收起", 13, dp(34), false);
         closeBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                if (!numeric) setVisible(false);
+                if (!numeric && !bigKeys) setVisible(false);
                 host.kbClose();
             }
         });
-
-        // 「字母 / 123」：服务器地址既能是 IP 也能是域名，默认给数字键盘（输 IP
-        // 更快），需要域名时一键切到完整键盘。
-        if (allowLayout) {
-            layoutBtn = makeKey(numeric ? "字母" : "123", 13, dp(34), false);
-            layoutBtn.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) { switchLayout(); }
-            });
-            LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
-            llp.rightMargin = dp(8);
-            header.addView(layoutBtn, llp);
-        }
 
         header.addView(closeBtn, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(34)));
@@ -167,31 +156,12 @@ final class TvKeyboard {
         root.addView(header, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        // 键区单独放在 body 里，切换布局时只重建这一块，标题行/输入预览不受影响
-        body = new LinearLayout(ctx);
-        body.setOrientation(LinearLayout.VERTICAL);
-        root.addView(body, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        fillBody();
+        // 1.2.2：去掉了「字母 / 123」切换——服务器地址键盘统一用「数字 + 字母」
+        // 一套布局（第一行就是 0-9），不需要再切纯数字，少一步操作。
+        if (numeric) buildNumeric(root);
+        else buildFull(root);
 
         return root;
-    }
-
-    private void fillBody() {
-        body.removeAllViews();
-        firstKey = null;
-        letterKeys.clear();
-        if (numeric) buildNumeric(body);
-        else buildFull(body);
-    }
-
-    private void switchLayout() {
-        numeric = !numeric;
-        shift = false;
-        if (layoutBtn != null) layoutBtn.setText(numeric ? "字母" : "123");
-        fillBody();
-        refresh();
-        focusFirst();
     }
 
     private void buildFull(LinearLayout root) {
@@ -338,8 +308,12 @@ final class TvKeyboard {
     }
 
     private LinearLayout.LayoutParams rowParams() {
+        // 1.2.2：服务器地址用大按键模式，行高从 50dp 提到约 72dp，配合加宽后的
+        // 弹窗（见 MainActivity.showIpKeypad），3 米外遥控器也能瞄准。
+        int h = numeric ? 56 : 50;
+        if (bigKeys) h = Math.round(h * 1.45f);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(numeric ? 56 : 50));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(h));
         lp.topMargin = dp(numeric ? 6 : 5);
         return lp;
     }
@@ -356,6 +330,10 @@ final class TvKeyboard {
     }
 
     private Button makeKey(String text, int textSize, int height, boolean big) {
+        if (bigKeys) {
+            textSize = Math.round(textSize * 1.3f);
+            height = Math.round(height * 1.45f);
+        }
         Button b = new Button(ctx);
         b.setText(text);
         b.setAllCaps(false);
