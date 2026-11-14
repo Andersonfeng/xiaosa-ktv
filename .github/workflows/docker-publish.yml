@@ -1,13 +1,14 @@
-# 自动构建并推送 Docker 镜像到 GitHub Container Registry (ghcr.io)
+# 自动构建并推送 Docker 镜像：一次构建，同时推两个仓库
+#
+#   ghcr.io/andersonfeng/xiaosa-ktv        用仓库自带的 GITHUB_TOKEN，不需要额外配置
+#   andersonfeng/xiaosa-ktv（Docker Hub）   需要先在 Settings → Secrets 里配
+#                                          DOCKERHUB_USERNAME / DOCKERHUB_TOKEN
+#                                          没配的时候自动只推 GHCR，不会让 CI 变红
 #
 # 触发方式：
 #   - push 到 main / master：构建 amd64 镜像，打 latest 和分支标签
 #   - push 形如 v1.0.0 的 tag：额外打 1.0.0 / 1.0 语义化版本标签
 #   - 也可以在 Actions 页面手动 Run workflow
-#
-# 产物：ghcr.io/andersonfeng/xiaosa-ktv:<tag>
-# 远端机器只要 `docker compose -f docker-compose.release.yml up -d`，
-# 并在 .env 里写 KTV_IMAGE=ghcr.io/andersonfeng/xiaosa-ktv:latest 即可。
 
 name: Build and push image
 
@@ -20,6 +21,7 @@ on:
 env:
   # 必须全小写：镜像仓库名不允许大写字母
   IMAGE_NAME: ghcr.io/andersonfeng/xiaosa-ktv
+  DOCKERHUB_IMAGE: andersonfeng/xiaosa-ktv
 
 jobs:
   build:
@@ -39,6 +41,32 @@ jobs:
       # - name: Set up QEMU
       #   uses: docker/setup-qemu-action@v3
 
+      # 有 DOCKERHUB_TOKEN 才把 Docker Hub 加进要推的镜像列表：
+      # 这样"没配密钥的仓库/PR"也能正常推 GHCR，不会因为缺 Docker Hub 凭据整条挂掉。
+      - name: Decide target registries
+        id: targets
+        env:
+          DH_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -n "$DH_TOKEN" ]; then
+            echo "dockerhub=true" >> "$GITHUB_OUTPUT"
+            {
+              echo "images<<IMAGES_EOF"
+              echo "$IMAGE_NAME"
+              echo "$DOCKERHUB_IMAGE"
+              echo "IMAGES_EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "将同时推送到 GHCR 和 Docker Hub"
+          else
+            echo "dockerhub=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "images<<IMAGES_EOF"
+              echo "$IMAGE_NAME"
+              echo "IMAGES_EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "未配置 DOCKERHUB_TOKEN，本次只推 GHCR"
+          fi
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -46,11 +74,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Log in to Docker Hub
+        if: steps.targets.outputs.dockerhub == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Extract tags / labels
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_NAME }}
+          images: ${{ steps.targets.outputs.images }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
