@@ -44,18 +44,34 @@ final class TvKeyboard {
 
     private final Context ctx;
     private final Host host;
-    private final boolean numeric;
     private final LinearLayout panel;
     private TextView labelView;
     private TextView valueView;
+    private LinearLayout body;
+    private Button layoutBtn;
     private final List<Button> letterKeys = new ArrayList<>();
     private Button firstKey;
     private boolean shift;
+    /** 当前是不是数字键盘布局。服务器地址输入框允许在"数字/字母"之间来回切。 */
+    private boolean numeric;
+    /** 是否在标题行给一个「字母 / 123」切换按钮（只有服务器地址输入需要）。 */
+    private final boolean allowLayout;
 
     TvKeyboard(Context context, Host host, boolean numeric) {
+        this(context, host, numeric, false);
+    }
+
+    /**
+     * @param allowLayout true 时标题行多一个「字母 / 123」按钮，能在数字键盘和
+     *                    完整键盘之间切换。服务器地址除了 192.168.1.10 这种 IP，
+     *                    也可能是 ktv.example.com / nas.local 这类域名，纯数字
+     *                    键盘根本敲不进去（1.2.1 修复）。
+     */
+    TvKeyboard(Context context, Host host, boolean numeric, boolean allowLayout) {
         this.ctx = context;
         this.host = host;
         this.numeric = numeric;
+        this.allowLayout = allowLayout;
         this.panel = build();
     }
 
@@ -131,16 +147,51 @@ final class TvKeyboard {
                 host.kbClose();
             }
         });
+
+        // 「字母 / 123」：服务器地址既能是 IP 也能是域名，默认给数字键盘（输 IP
+        // 更快），需要域名时一键切到完整键盘。
+        if (allowLayout) {
+            layoutBtn = makeKey(numeric ? "字母" : "123", 13, dp(34), false);
+            layoutBtn.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { switchLayout(); }
+            });
+            LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
+            llp.rightMargin = dp(8);
+            header.addView(layoutBtn, llp);
+        }
+
         header.addView(closeBtn, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, dp(34)));
 
         root.addView(header, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        if (numeric) buildNumeric(root);
-        else buildFull(root);
+        // 键区单独放在 body 里，切换布局时只重建这一块，标题行/输入预览不受影响
+        body = new LinearLayout(ctx);
+        body.setOrientation(LinearLayout.VERTICAL);
+        root.addView(body, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        fillBody();
 
         return root;
+    }
+
+    private void fillBody() {
+        body.removeAllViews();
+        firstKey = null;
+        letterKeys.clear();
+        if (numeric) buildNumeric(body);
+        else buildFull(body);
+    }
+
+    private void switchLayout() {
+        numeric = !numeric;
+        shift = false;
+        if (layoutBtn != null) layoutBtn.setText(numeric ? "字母" : "123");
+        fillBody();
+        refresh();
+        focusFirst();
     }
 
     private void buildFull(LinearLayout root) {

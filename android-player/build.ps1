@@ -33,8 +33,8 @@ $keystoreDir = Join-Path $Root "keystore"
 $keystore = Join-Path $keystoreDir "xiaosa-release.jks"
 $storePass = "xiaosa123"
 $keyAlias = "xiaosa"
-$version = "1.2.0"
-$versionCode = 4
+$version = "1.2.1"
+$versionCode = 5
 $outName = "潇洒K歌-TV播放端-v$version.apk"
 
 if (Test-Path $build) { Remove-Item -Recurse -Force $build }

@@ -1183,8 +1183,8 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
 
         TextView hint = new TextView(this);
         hint.setText(isTouch
-                ? "不带端口默认 8083；例如 http://192.168.1.100:8083"
-                : "不带端口默认 8083。选中地址框按 OK 可用遥控器数字键盘输入。");
+                ? "可填 IP 或域名，不带端口默认 8083；例如 http://192.168.1.100:8083、http://ktv.local:8083"
+                : "可填 IP 或域名，不带端口默认 8083。选中地址框按 OK 打开屏幕键盘，点标题行的「字母」可切换成完整键盘输域名。");
         hint.setTextColor(0xFF666688);
         hint.setTextSize(12);
         hint.setPadding(dp(2), dp(6), 0, dp(8));
@@ -1356,7 +1356,9 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         }
         kbMode = MODE_IP;
         kbTarget = serverInput;
-        ipKeyboard = new TvKeyboard(this, this, true);
+        // 第四个参数 true：标题行给一个「字母 / 123」切换按钮。
+        // 只给数字键盘的话，ktv.example.com、nas.local 这类域名根本输不进来。
+        ipKeyboard = new TvKeyboard(this, this, true, true);
         ipKeyboard.refresh();
 
         final Dialog d = new Dialog(this);
@@ -1396,7 +1398,7 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
     private void connect() {
         String base = normalizeBase(serverInput.getText().toString());
         if (base == null) {
-            setupStatus.setText("地址格式不对，请输入 IP 或 http://IP:端口");
+            setupStatus.setText("地址格式不对，请输入 IP 或域名，例如 http://192.168.1.100:8083 或 http://ktv.local:8083");
             return;
         }
         stopScan();

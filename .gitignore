@@ -23,6 +23,8 @@ data/
 # Android 构建临时目录
 .tools/
 android-player/build/
+# apksigner 生成的 v4 签名边带文件，安装用不到
+*.idsig
 
 # Docker 部署：运行时数据（数据库/曲库/HLS 缓存）与本地配置（含密码）
 ktv-data/
