@@ -797,7 +797,9 @@ html[data-theme="3"][data-layout="tv"] #s3-stage{display:flex}
    额外的常驻描边，所以这里去掉了 .s3-active 的 box-shadow，只保留基础阴影，
    描边完全跟随真实的键盘/遥控器焦点。 */
 .s3-card.s3-active{box-shadow:0 24px 60px rgba(0,0,0,.55)}
-.s3-card[data-f].focused{box-shadow:0 0 0 3px #fff,0 24px 60px rgba(0,0,0,.55)}
+/* 1.3.5：描边从 3px 加粗到 6px，和通用焦点框统一——轮播卡是风格三下的主
+   交互区，3px 在 3 米外太细，老人看不出选中的是哪一张。 */
+.s3-card[data-f].focused{box-shadow:0 0 0 6px #fff,0 24px 60px rgba(0,0,0,.55)}
 /* 下方：暂停/原伴唱/重唱/切歌/音量- —— 居中小MV预览窗 —— 音量+/均衡器/设置/扫码/已点。
    整条按钮栏要占满下方整行宽度、不要边框/背景色块(区别于其它风格里的 .mvbtn
    默认样式)，左右两组各自 flex:1 平分空间，组内每个按钮也 flex:1，这样不管
@@ -1118,8 +1120,11 @@ html[data-layout="mobile"] #next-up-track span{font-size:16px}
      "歌名等按钮聚焦放大被MV框遮挡"的真正成因。转成合成层能让多数内核放弃硬件叠加层
      直通、回到正常按层叠顺序渲染的路径。*/
   transform:translateZ(0)}
-/* MV框可以被遥控器选中：聚焦态放大+提亮，不用描边框，选中后按OK等价于点击进入全屏 */
-#now-panel[data-f].focused{transform:translateZ(0) scale(1.015);filter:brightness(1.15) saturate(1.15)}
+/* MV框可以被遥控器选中：聚焦态放大+提亮，选中后按OK等价于点击进入全屏。
+   1.3.5：这里刻意不套通用那圈白色描边——MV 框一旦被选中会一直亮着，正在播的
+   视频四周常驻白框太抢眼；继续用"提亮+轻微放大"表示焦点。
+   （风格三把它缩成小卡片时，由 #s3-mv-slot 那条规则补白框。） */
+#now-panel[data-f].focused{transform:translateZ(0) scale(1.015);filter:brightness(1.15) saturate(1.15);box-shadow:none}
 /* MV下方大按钮控制条：均衡器/原伴唱/音量-/暂停/音量+/切歌/重唱，纯白线条图标+下方文字，
    风格与全屏控制层的 .ob 按钮统一：加边框+背景色块+更大的间距，聚焦/悬停/选中态
    都是背景色块+边框变色+放大。
@@ -1633,8 +1638,12 @@ html[data-layout="tv"] #pl-newest{
   padding:8px 18px;border-radius:10px;font-size:17px;z-index:99;backdrop-filter:blur(12px);transition:transform .28s}
 #toast.show{transform:translateX(-50%) translateY(0)}
 .pc[data-f].focused,.pc:hover{background:rgba(54,217,247,.3);color:var(--ac2);transform:scale(1.15)}
-/* 通用兜底：没有专门写聚焦样式的 data-f 元素，一律用"颜色+放大"表现，不用任何描边框 */
-[data-f].focused{background:rgba(54,217,247,.25);transform:scale(1.08)}
+/* 通用兜底：没有专门写聚焦样式的 data-f 元素，一律用"颜色+放大+白色描边"表现。
+   1.3.5：遥控器选中原来只有 scale(1.08) 和一点点变色，3 米外（尤其老人）
+   几乎看不出焦点停在哪。现在统补一圈 6px 白色描边。
+   必须用 inset 描边而不是外描边：歌曲行在 .song-list(overflow:auto) 里、
+   首页四张大卡片自己有 overflow:hidden，外描边会被裁掉半圈，inset 永远完整。 */
+[data-f].focused{background:rgba(54,217,247,.25);transform:scale(1.08);box-shadow:inset 0 0 0 6px #fff}
 
 /* ============================================================
    响应式：竖屏(手机)/横屏(电视)布局切换
