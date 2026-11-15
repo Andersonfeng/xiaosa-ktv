@@ -11,34 +11,51 @@ import java.net.URLDecoder;
 
 /**
  * 电视端的"手机输入"小服务：在电视上开一个极简 HTTP 服务，手机扫码打开页面，
- * 输入服务器地址后提交，电视立刻拿到并填进设置页。
+ * 输入内容后提交，电视立刻拿到并填好。
  *
- * 为什么自己写：只是为了收一个字符串，引 NanoHTTPD 之类要几百 KB，不值当。
+ * 两种用途（mode）：
+ *  - MODE_ADDRESS：手机上填服务器地址，服务端把地址交给设置页的地址框；
+ *  - MODE_LOGIN  ：手机上填账号 + 密码，交给登录页（1.2.4 新增，方便在电视上
+ *                  敲不了复杂密码的场景）。
+ *
+ * 为什么自己写：只是为了收两个字符串，引 NanoHTTPD 之类要几百 KB，不值当。
  * 这个实现只支持 GET / 和 POST /set，请求体最大 4KB，连接读超时 8 秒，
  * 不处理 keep-alive、不支持 HTTPS——局域网内一次性使用足够。
  *
- * 生命周期：点「手机输入」时 start()，收到地址或关闭弹窗时 stop()。
+ * 生命周期：点「手机输入」时 start()，收到内容或关闭弹窗时 stop()。
  * 线程模型：accept 循环跑在守护线程里，每个连接在同一个线程里同步处理
  * （请求都很小，串行处理最简单，也不会出现并发写状态的问题）。
  */
 final class PhoneInputServer {
 
+    /** 手机端填服务器地址。 */
+    static final int MODE_ADDRESS = 0;
+    /** 手机端填电视端账号 + 密码。 */
+    static final int MODE_LOGIN = 1;
+
     interface Listener {
-        /** 收到手机提交的地址，回调发生在网络线程，调用方要自己切回 UI 线程。 */
-        void onAddress(String address);
+        /**
+         * 收到手机提交的内容，回调发生在网络线程，调用方要自己切回 UI 线程。
+         *
+         * @param mode MODE_ADDRESS：a=服务器地址，b=null；
+         *             MODE_LOGIN  ：a=账号，b=密码
+         */
+        void onInput(int mode, String a, String b);
     }
 
     private static final int FIRST_PORT = 8098;
     private static final int LAST_PORT = 8108;
 
     private final Listener listener;
+    private final int mode;
     private ServerSocket serverSocket;
     private Thread thread;
     private volatile boolean running;
     private int port;
 
-    PhoneInputServer(Listener listener) {
+    PhoneInputServer(Listener listener, int mode) {
         this.listener = listener;
+        this.mode = mode;
     }
 
     /**
@@ -153,6 +170,22 @@ final class PhoneInputServer {
             return;
         }
         if ("POST".equalsIgnoreCase(method) && path.startsWith("/set")) {
+            if (mode == MODE_LOGIN) {
+                String user = formValue(body, "user");
+                String pass = formValue(body, "pass");
+                if (user != null) user = user.trim();
+                if (user == null || user.isEmpty() || pass == null || pass.isEmpty()) {
+                    writeResponse(out, 400, "text/html; charset=utf-8",
+                            donePage("账号和密码都要填，请回到手机上重新输入。", true));
+                    return;
+                }
+                if (user.length() > 100) user = user.substring(0, 100);
+                if (pass.length() > 200) pass = pass.substring(0, 200);
+                if (listener != null) listener.onInput(mode, user, pass);
+                writeResponse(out, 200, "text/html; charset=utf-8",
+                        donePage("账号密码已发送到电视，可以放下手机了。", false));
+                return;
+            }
             String addr = formValue(body, "addr");
             if (addr == null || addr.trim().isEmpty()) {
                 writeResponse(out, 400, "text/html; charset=utf-8", donePage("地址是空的，请回到手机上重新输入。", true));
@@ -160,12 +193,12 @@ final class PhoneInputServer {
             }
             String clean = addr.trim();
             if (clean.length() > 200) clean = clean.substring(0, 200);
-            if (listener != null) listener.onAddress(clean);
+            if (listener != null) listener.onInput(mode, clean, null);
             writeResponse(out, 200, "text/html; charset=utf-8", donePage("已发送到电视，可以放下手机了。", false));
             return;
         }
         if ("GET".equalsIgnoreCase(method) && (path.equals("/") || path.startsWith("/?"))) {
-            writeResponse(out, 200, "text/html; charset=utf-8", formPage());
+            writeResponse(out, 200, "text/html; charset=utf-8", formPage(mode));
             return;
         }
         writeResponse(out, 404, "text/plain; charset=utf-8", "not found");
@@ -199,11 +232,8 @@ final class PhoneInputServer {
         return null;
     }
 
-    private static String formPage() {
-        return "<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">"
-                + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
-                + "<title>潇洒K歌 · 输入服务器地址</title><style>"
-                + "body{font-family:-apple-system,Helvetica,Arial,sans-serif;background:#0b0b1e;color:#f4f4ff;"
+    private static String formPage(int mode) {
+        String css = "body{font-family:-apple-system,Helvetica,Arial,sans-serif;background:#0b0b1e;color:#f4f4ff;"
                 + "margin:0;padding:28px 20px;}"
                 + "h1{font-size:20px;margin:0 0 6px}p{color:#9a9ac0;font-size:14px;line-height:1.6;margin:0 0 18px}"
                 + "input{width:100%;box-sizing:border-box;font-size:18px;padding:14px;border-radius:12px;"
@@ -211,7 +241,30 @@ final class PhoneInputServer {
                 + "button{width:100%;margin-top:16px;padding:15px;font-size:17px;font-weight:600;border:0;"
                 + "border-radius:12px;background:linear-gradient(135deg,#c736f7,#36d9f7);color:#fff}"
                 + ".hint{margin-top:16px;font-size:13px;color:#6a6a90}"
-                + "</style></head><body>"
+                + "label{display:block;font-size:14px;color:#9a9ac0;margin:14px 0 6px}"
+                + ".show{display:flex;align-items:center;gap:10px;font-size:14px;color:#7a7aa0;margin-top:12px}"
+                + ".show input{width:22px;height:22px;padding:0;flex:0 0 auto}";
+        String head = "<!doctype html><html lang=\"zh-CN\"><head><meta charset=\"utf-8\">"
+                + "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">";
+        if (mode == MODE_LOGIN) {
+            return head + "<title>潇洒K歌 · 手机登录</title><style>" + css + "</style></head><body>"
+                    + "<h1>潇洒K歌</h1><p>输入电视端的账号和密码，提交后电视会自动填好，按一下遥控器 OK 就登录。</p>"
+                    + "<form method=\"post\" action=\"/set\">"
+                    + "<label>账号</label>"
+                    + "<input name=\"user\" placeholder=\"电视端账号\" autofocus "
+                    + "autocapitalize=\"off\" autocorrect=\"off\" spellcheck=\"false\">"
+                    + "<label>密码</label>"
+                    + "<input name=\"pass\" id=\"pw\" type=\"password\" placeholder=\"密码\" "
+                    + "autocapitalize=\"off\" autocorrect=\"off\" autocomplete=\"off\" spellcheck=\"false\">"
+                    + "<label class=\"show\"><input type=\"checkbox\" "
+                    + "onclick=\"document.getElementById('pw').type=this.checked?'text':'password'\">"
+                    + "显示密码</label>"
+                    + "<button type=\"submit\">发送到电视</button></form>"
+                    + "<p class=\"hint\">手机和电视要在同一个局域网（同一个 WiFi）。"
+                    + "密码里有 !@# 之类的符号也没问题。</p>"
+                    + "</body></html>";
+        }
+        return head + "<title>潇洒K歌 · 输入服务器地址</title><style>" + css + "</style></head><body>"
                 + "<h1>潇洒K歌</h1><p>请输入电视要连接的服务器地址，提交后电视会自动填好。</p>"
                 + "<form method=\"post\" action=\"/set\">"
                 + "<input name=\"addr\" placeholder=\"http://192.168.1.100:8083\" autofocus "

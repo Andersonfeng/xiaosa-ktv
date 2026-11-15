@@ -3915,18 +3915,26 @@ function blurRealInput(){const a=document.activeElement;if(a&&/^(INPUT|TEXTAREA)
 // 而是统一按名字调用它们——这样子面板(如歌星->某歌手的歌曲列表)在按物理
 // 遥控器"返回"键关闭时，也能像点击面板内"返回"按钮一样正确回到父面板，
 // 而不是直接被打回主页；同时焦点记忆栈(pushFocus/popFocus)也能一并生效。
+//
+// 返回 true = 这次确实关掉了一层；false = 已经在主页顶层，没什么可关的。
+// 之所以要返回布尔值：原生 APK 的返回键要靠它判断"这一下该由网页吃掉，
+// 还是该弹退出菜单"——点完歌按返回应该是回上一页，而不是被"要继续观看/
+// 修改服务器地址"的弹窗挡在脸上（用户反馈）。
 function closeTopPanel(){
   const fsq=document.getElementById('fsq');
-  if(fsq.classList.contains('open')){fsq.classList.remove('open');return;}
+  if(fsq.classList.contains('open')){fsq.classList.remove('open');return true;}
   const openFull=document.querySelector('.pd-full.open');
-  if(openFull){closePF(openFull.id.replace('pf-',''));return;}
+  if(openFull){closePF(openFull.id.replace('pf-',''));return true;}
   const openHalf=document.querySelector('.pd.open');
-  if(openHalf){closePanel(openHalf.id.replace('pd-',''));return;}
-  if(video.classList.contains('video-fs')){exitKtvFullscreen();return;}
-  // Bug8：已经退到主页顶层了，没有任何弹窗/全屏可以再关——这里走"再按一次返回退出"
-  // 的确认流程，而不是什么都不做（之前就是什么都不做，相当于返回键在主页完全失效）。
-  if(window.__handleHomeBack)window.__handleHomeBack();
+  if(openHalf){closePanel(openHalf.id.replace('pd-',''));return true;}
+  if(video.classList.contains('video-fs')){exitKtvFullscreen();return true;}
+  return false;
 }
+// 网页内所有"返回"入口（遥控器返回键、手机遥控的返回、Esc）的统一实现：
+// 有关得掉的先关一层，已经到主页顶层才走"再按一次返回键退出"的确认。
+function backAction(){if(closeTopPanel())return true;if(window.__handleHomeBack)window.__handleHomeBack();return false;}
+// 给原生 APK 调用：只回答"这一层能不能关"，不触发退出确认（退出菜单由 APK 弹）。
+window.__ktvBack=function(){return closeTopPanel();};
 // 返回键退出确认：主页顶层再按一次返回键，2秒内确认则尝试退出。
 // 纯网页在浏览器标签页里通常没有脚本可调用的"关闭自己"的标准方式（出于安全策略，
 // window.close() 只对脚本自己打开的窗口生效），这里把已知的几种宿主环境退出方式都
@@ -3956,7 +3964,7 @@ function closeTopPanel(){
   history.pushState(null,'',location.href);
   window.addEventListener('popstate',function(){
     history.pushState(null,'',location.href);
-    closeTopPanel();
+    backAction();
   });
 })();
 // ============ 弹窗开关动画 ============
@@ -4861,7 +4869,7 @@ function handleRemote(m){
     case 'focus_left':moveFocus('left');break;
     case 'focus_right':moveFocus('right');break;
     case 'ok':activateFocused();break;
-    case 'back':closeTopPanel();break;
+    case 'back':backAction();break;
     case 'seek':if(isActivePlayer&&typeof m.time==='number')video.currentTime=m.time;break;
   }
 }
@@ -5013,7 +5021,7 @@ function moveFocus(d){
   if(isFS)showOverlay();
 }
 function activateFocused(){blurRealInput();focEls=getFocusables();if(focEls[focIdx])focEls[focIdx].click();}
-document.addEventListener('keydown',e=>{if(isFS)showOverlay();switch(e.key){case 'ArrowUp':moveFocus('up');e.preventDefault();break;case 'ArrowDown':moveFocus('down');e.preventDefault();break;case 'ArrowLeft':moveFocus('left');e.preventDefault();break;case 'ArrowRight':moveFocus('right');e.preventDefault();break;case 'Enter':activateFocused();break;case ' ':togglePause();e.preventDefault();break;case 'Escape':closeTopPanel();break;case 'f':case 'F':isFS?exitKtvFullscreen():enterFullscreen();break;case 'n':case 'N':cutSong();break;}
+document.addEventListener('keydown',e=>{if(isFS)showOverlay();switch(e.key){case 'ArrowUp':moveFocus('up');e.preventDefault();break;case 'ArrowDown':moveFocus('down');e.preventDefault();break;case 'ArrowLeft':moveFocus('left');e.preventDefault();break;case 'ArrowRight':moveFocus('right');e.preventDefault();break;case 'Enter':activateFocused();break;case ' ':togglePause();e.preventDefault();break;case 'Escape':backAction();break;case 'f':case 'F':isFS?exitKtvFullscreen():enterFullscreen();break;case 'n':case 'N':cutSong();break;}
 });
 function esc(s){return String(s||'').replace(/'/g,"&#39;");}
 function showToast(m,persist){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._hideTimer);if(!persist)t._hideTimer=setTimeout(()=>t.classList.remove('show'),1800);}

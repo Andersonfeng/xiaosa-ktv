@@ -38,6 +38,7 @@ import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
 import android.webkit.ConsoleMessage;
 import android.webkit.CookieManager;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -127,10 +128,13 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
     private Button phoneBtn;
     private Button loginBtn;
     private Button keyboardBtn;
+    private Button loginPhoneBtn;
 
     private TvKeyboard loginKeyboard;
     private TvKeyboard ipKeyboard;
     private Dialog ipDialog;
+    /** 登录页的屏幕键盘弹窗（1.2.4 起改成底部大键盘，和服务器地址页一致）。 */
+    private Dialog loginKbDialog;
     private Dialog phoneDialog;
     private PhoneInputServer phoneServer;
     private int kbMode = MODE_NONE;
@@ -860,33 +864,40 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         card.addView(row, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
-        if (!isTouch) {
-            keyboardBtn = makeButton("屏幕键盘（遥控器）", false);
-            LinearLayout.LayoutParams klp = new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
-            klp.topMargin = dp(10);
-            card.addView(keyboardBtn, klp);
-        }
+        // 1.2.4：以前这里是整块内嵌键盘，接在登录卡片下面；卡片本身就快占满
+        // 一屏了，键盘被挤到屏幕外，遥控器又没地方滚——用户反馈"键盘可能不会
+        // 出现"。现在改成和服务地址页一样的做法：点按钮弹出底部大键盘，
+        // 顺带把「手机输入」也放到登录页（手机扫码填账号密码）。
+        //
+        // 这两个按钮**不再按 isTouch 隐藏**：有些电视盒子会误报自己有触摸屏，
+        // 一旦被当成平板，按键键盘就整个消失，只能指望盒子的系统输入法——
+        // 正好就是"键盘不出现"。真·平板上这两个按钮也能点，没有副作用。
+        LinearLayout kbRow = new LinearLayout(this);
+        kbRow.setOrientation(LinearLayout.HORIZONTAL);
+        keyboardBtn = makeButton("屏幕键盘", false);
+        loginPhoneBtn = makeButton("手机输入", false);
+        LinearLayout.LayoutParams klp = new LinearLayout.LayoutParams(0, dp(46), 1);
+        klp.rightMargin = dp(10);
+        klp.topMargin = dp(10);
+        kbRow.addView(keyboardBtn, klp);
+        LinearLayout.LayoutParams klp2 = new LinearLayout.LayoutParams(0, dp(46), 1);
+        klp2.topMargin = dp(10);
+        kbRow.addView(loginPhoneBtn, klp2);
+        card.addView(kbRow, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView hint = new TextView(this);
         hint.setText(isTouch
-                ? "首次登录需要账号密码；登录成功后会记住，下次自动进入。"
-                : "遥控器：方向键选择，OK 确认。\n选中输入框后按 OK，会自动打开下方屏幕键盘。");
+                ? "首次登录需要账号密码；登录成功后会记住，下次自动进入。\n"
+                        + "密码比较复杂时，点「手机输入」用手机扫码填账号密码。"
+                : "遥控器：方向键选择，OK 确认。选中输入框按 OK 弹出屏幕键盘；\n"
+                        + "账号密码比较复杂时，也可以点「手机输入」用手机扫码填写。");
         hint.setTextColor(0xFF666688);
         hint.setTextSize(12);
         hint.setGravity(Gravity.CENTER);
         hint.setLineSpacing(dp(2), 1f);
         hint.setPadding(0, dp(10), 0, 0);
         card.addView(hint);
-
-        if (!isTouch) {
-            loginKeyboard = new TvKeyboard(this, this, false);
-            LinearLayout.LayoutParams klp2 = new LinearLayout.LayoutParams(
-                    cardW, ViewGroup.LayoutParams.WRAP_CONTENT);
-            klp2.topMargin = dp(12);
-            outer.addView(loginKeyboard.getView(), klp2);
-            loginKeyboard.setVisible(true);
-        }
 
         loginUser.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override public void onFocusChange(View v, boolean hasFocus) {
@@ -937,11 +948,15 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         if (keyboardBtn != null) {
             keyboardBtn.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) {
-                    if (loginKeyboard != null) {
-                        loginKeyboard.setVisible(true);
-                        loginKeyboard.focusFirst();
-                    }
+                    // 从哪个输入框进来就先编辑哪个；没选区就默认账号。
+                    EditText target = (kbTarget == loginPass) ? loginPass : loginUser;
+                    showLoginKeypad(target);
                 }
+            });
+        }
+        if (loginPhoneBtn != null) {
+            loginPhoneBtn.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { showPhoneCard(PhoneInputServer.MODE_LOGIN); }
             });
         }
 
@@ -1003,9 +1018,9 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         } else if (!webLoaded) setLoginStatus("请输入电视端账号密码", false);
         else setLoginStatus("请重新登录电视端账号", false);
 
-        if (!isTouch && loginKeyboard != null) {
-            loginKeyboard.setVisible(true);
-            loginKeyboard.refresh();
+        if (!isTouch && loginKbDialog != null && loginKbDialog.isShowing()) {
+            // 之前用户名密码错误被踢回登录页时，键盘弹窗还开着，这里保持打开状态即可
+            if (loginKeyboard != null) loginKeyboard.refresh();
         }
         if (loginServerText != null) {
             loginServerText.setText("服务器：" + (currentBase == null ? "未设置" : currentBase) +
@@ -1261,7 +1276,7 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
             @Override public void onClick(View v) { showIpKeypad(); }
         });
         phoneBtn.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { showPhoneInput(); }
+            @Override public void onClick(View v) { showPhoneCard(PhoneInputServer.MODE_ADDRESS); }
         });
         serverInput.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
@@ -1314,6 +1329,8 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         if (loginView != null) loginView.setVisibility(View.GONE);
         if (errorView != null) errorView.setVisibility(View.GONE);
         if (compatView != null) compatView.setVisibility(View.GONE);
+        // 登录页的键盘弹窗是独立窗口，不跟着登录页隐藏，必须手动收掉
+        dismissLoginKeypad();
         hideLoading();
         setupView.setVisibility(View.VISIBLE);
         setupView.bringToFront();
@@ -1355,11 +1372,8 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         if (to == RETURN_LOGIN && loginView != null) {
             loginView.setVisibility(View.VISIBLE);
             loginView.bringToFront();
-            if (!isTouch && loginKeyboard != null) {
-                loginKeyboard.setVisible(true);
-                loginKeyboard.refresh();
-            }
             loginUser.requestFocus();
+            setKbTarget(MODE_LOGIN, loginUser);
         } else if (to == RETURN_ERROR && errorView != null) {
             errorView.setVisibility(View.VISIBLE);
             errorView.bringToFront();
@@ -1422,24 +1436,34 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
     }
 
     /**
-     * 「手机输入」：电视右上角弹一个二维码，手机扫码打开页面输入服务器地址，
-     * 提交后电视自动填进地址框。
+     * 「手机输入」卡片：电视右上角弹一个二维码，手机扫码打开页面输入内容，
+     * 提交后电视自动填好。
+     *
+     * mode = MODE_ADDRESS：手机填服务器地址 → 填进设置页地址框；
+     * mode = MODE_LOGIN  ：手机填账号 + 密码 → 填进登录页（1.2.4 新增）。
      *
      * 前提是电视已经连上局域网（二维码里就是电视自己的 IP:端口），所以它适合
-     * "换服务器地址"，不适合全新电视的第一次配置——那种情况电视还没网、
+     * "换服务器地址/登录"，不适合全新电视的第一次配置——那种情况电视还没网、
      * 二维码指向的地址打不开，还是得用屏幕键盘或自动搜索。
      */
-    private void showPhoneInput() {
-        if (serverInput == null) return;
+    private void showPhoneCard(final int mode) {
         if (phoneDialog != null && phoneDialog.isShowing()) return;
+        final boolean forLogin = mode == PhoneInputServer.MODE_LOGIN;
+        if (forLogin) {
+            if (loginView == null || loginView.getVisibility() != View.VISIBLE) return;
+        } else {
+            if (serverInput == null) return;
+        }
         if (localIp == null) scanLocalNetworks();
         if (localIp == null) {
-            setupStatus.setText("电视还没联网，拿不到本机 IP，暂时不能用手机输入；可以先用屏幕键盘");
+            String msg = "电视还没联网，拿不到本机 IP，暂时不能用手机输入；可以先用屏幕键盘";
+            if (forLogin) setLoginStatus(msg, true);
+            else if (setupStatus != null) setupStatus.setText(msg);
             return;
         }
 
         phoneServer = new PhoneInputServer(new PhoneInputServer.Listener() {
-            @Override public void onAddress(final String address) {
+            @Override public void onInput(int m, final String a, final String b) {
                 // 回调在网络线程，UI 操作必须切回主线程
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
@@ -1447,16 +1471,27 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
                             phoneDialog.dismiss();
                             phoneDialog = null;
                         }
-                        if (serverInput != null) serverInput.setText(address);
-                        setupStatus.setText("手机已发送地址：" + address + "，确认无误后点「连接」");
+                        if (forLogin) {
+                            if (loginUser != null) loginUser.setText(a == null ? "" : a);
+                            if (loginPass != null) loginPass.setText(b == null ? "" : b);
+                            setLoginStatus("账号密码已从手机填入，按 OK 登录", false);
+                            if (loginBtn != null) loginBtn.requestFocus();
+                        } else {
+                            if (serverInput != null) serverInput.setText(a == null ? "" : a);
+                            if (setupStatus != null) {
+                                setupStatus.setText("手机已发送地址：" + a + "，确认无误后点「连接」");
+                            }
+                        }
                     }
                 });
             }
-        });
+        }, mode);
         final String url = phoneServer.start(localIp);
         if (url == null) {
             phoneServer = null;
-            setupStatus.setText("手机输入服务启动失败：8098~8108 端口都被占用了");
+            String msg = "手机输入服务启动失败：8098~8108 端口都被占用了";
+            if (forLogin) setLoginStatus(msg, true);
+            else if (setupStatus != null) setupStatus.setText(msg);
             return;
         }
 
@@ -1466,14 +1501,16 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         card.setBackground(roundRect(0xF2141430, 18, 0x66FFFFFF));
 
         TextView title = new TextView(this);
-        title.setText("手机扫码输入");
+        title.setText(forLogin ? "手机扫码登录" : "手机扫码输入");
         title.setTextColor(0xFFF4F4FF);
         title.setTextSize(16);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         card.addView(title);
 
         TextView sub = new TextView(this);
-        sub.setText("手机和电视连同一个 WiFi，扫码后输入服务器地址");
+        sub.setText(forLogin
+                ? "手机和电视连同一个 WiFi，扫码后输入账号和密码"
+                : "手机和电视连同一个 WiFi，扫码后输入服务器地址");
         sub.setTextColor(0xFFB8B8D8);
         sub.setTextSize(11);
         sub.setLineSpacing(dp(1), 1f);
@@ -1481,9 +1518,20 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         card.addView(sub);
 
         ImageView qrView = new ImageView(this);
-        qrView.setImageBitmap(QrBitmap.render(QrCode.encode(url), dp(190)));
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        // 卡片宽度不能死写 300dp：表单卡片最宽 780dp 居中，两侧的空白可能只有
+        // 一百多 dp（960dp 宽的盒子上很常见）。卡片硬挤到右上角会压住表单右侧的
+        // 按钮和文字——用户要的就是"不遮挡其他内容"。这里先算两侧空隙：
+        // 够宽就贴右上角（不压暗），不够宽就退化成居中的普通弹窗（压暗）。
+        int formW = Math.min(screenW - dp(48), dp(780));
+        int sideGap = (screenW - formW) / 2;
+        boolean corner = sideGap >= dp(240);
+        int cardW = corner ? Math.min(dp(300), sideGap - dp(28))
+                : Math.min(screenW - dp(48), dp(360));
+        int qrSize = Math.max(dp(120), Math.min(dp(190), cardW - dp(32)));
+        qrView.setImageBitmap(QrBitmap.render(QrCode.encode(url), qrSize));
         qrView.setAdjustViewBounds(true);
-        LinearLayout.LayoutParams qlp = new LinearLayout.LayoutParams(dp(190), dp(190));
+        LinearLayout.LayoutParams qlp = new LinearLayout.LayoutParams(qrSize, qrSize);
         qlp.gravity = Gravity.CENTER_HORIZONTAL;
         card.addView(qrView, qlp);
 
@@ -1492,6 +1540,7 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         urlView.setTextColor(0xFF36D9F7);
         urlView.setTextSize(12);
         urlView.setGravity(Gravity.CENTER);
+        urlView.setSingleLine(false);
         urlView.setPadding(0, dp(8), 0, dp(10));
         card.addView(urlView);
 
@@ -1508,10 +1557,9 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         final Dialog d = new Dialog(this);
         d.requestWindowFeature(Window.FEATURE_NO_TITLE);
         FrameLayout wrap = new FrameLayout(this);
-        int screenW = getResources().getDisplayMetrics().widthPixels;
-        int cardW = Math.min(screenW - dp(40), dp(300));
         FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(cardW,
-                ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.END);
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                corner ? (Gravity.TOP | Gravity.END) : Gravity.CENTER);
         clp.topMargin = dp(20);
         clp.rightMargin = dp(20);
         wrap.addView(card, clp);
@@ -1520,8 +1568,15 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         if (win != null) {
             win.setBackgroundDrawable(new ColorDrawable(0x00000000));
             win.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
-            win.setGravity(Gravity.TOP | Gravity.END);
-            // 刻意不加 FLAG_DIM_BEHIND：不压暗背景，二维码贴在右上角，左边的地址/按钮照样看得见
+            win.setGravity(corner ? (Gravity.TOP | Gravity.END) : Gravity.CENTER);
+            if (!corner) {
+                // 放不下侧面时才压暗：这时候它就是普通弹窗，压暗反而更清楚
+                win.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+                WindowManager.LayoutParams lp = win.getAttributes();
+                lp.dimAmount = 0.6f;
+                win.setAttributes(lp);
+            }
+            // 贴右上角时刻意不加 FLAG_DIM_BEHIND：不压暗背景，左边的地址/按钮照样看得见
         }
         d.setOnDismissListener(new DialogInterface.OnDismissListener() {
             @Override public void onDismiss(DialogInterface dialog) {
@@ -1530,7 +1585,11 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
                     phoneServer.stop();
                     phoneServer = null;
                 }
-                if (serverInput != null) serverInput.requestFocus();
+                if (forLogin) {
+                    if (loginUser != null) loginUser.requestFocus();
+                } else if (serverInput != null) {
+                    serverInput.requestFocus();
+                }
             }
         });
         phoneDialog = d;
@@ -2050,6 +2109,11 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
 
     @Override
     public void onBackPressed() {
+        if (loginKbDialog != null && loginKbDialog.isShowing()) {
+            dismissLoginKeypad();
+            if (loginBtn != null) loginBtn.requestFocus();
+            return;
+        }
         if (ipDialog != null && ipDialog.isShowing()) {
             ipDialog.dismiss();
             return;
@@ -2075,13 +2139,49 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
             else showExitDialog();
             return;
         }
-        // 先让网页关闭自己的弹层（Escape），再弹原生返回菜单。
+        // 1.3.4/1.2.4：电视页上的返回键先交给网页自己处理——网页里还开着二级页/
+        // 浮层（点歌、榜单、搜索、全屏歌词…）就让它关一层、回到上一页；
+        // 只有已经退到主页顶层时，才弹"继续观看/服务器设置/退出应用"这个原生菜单。
+        // 以前不分场合直接弹菜单，用户点完歌想按返回回上一页，结果每次都被挡住。
+        if (webView != null && isTvPage()) {
+            handleTvBack();
+            return;
+        }
+        // 其它页面（例如后台管理）保持老行为：先让网页关掉自己的弹层，再弹原生菜单。
         if (webView != null) {
-            webView.evaluateJavascript(
-                    "(function(){try{var e=new KeyboardEvent('keydown',{key:'Escape',code:'Escape',keyCode:27,which:27,bubbles:true,cancelable:true});document.dispatchEvent(e);}catch(err){}})();",
-                    null);
+            injectWebKey("Escape", "Escape", 27);
         }
         showBackDialog();
+    }
+
+    /**
+     * 电视页的返回键：问网页"你自己能不能吞掉这次返回"。
+     *
+     * 网页侧（tv/index.html、tv/clean.html、tv_old/index.html）暴露了
+     * window.__ktvBack()，返回 true 表示关掉了一层（歌星→歌手列表、面板→主页…），
+     * false 表示已经在主页顶层。老版本服务端还没有这个函数，这里用同一套 DOM
+     * 判断兜底，然后补发一个 Escape（网页里 Escape 和返回键走同一个入口）。
+     */
+    private void handleTvBack() {
+        if (webView == null) { showBackDialog(); return; }
+        String js = "(function(){try{"
+                + "if(typeof window.__ktvBack==='function'){return window.__ktvBack()?'1':'0';}"
+                + "var q=function(s){return !!document.querySelector(s)};"
+                + "var open=q('#fsq.open')||q('.pd-full.open')||q('.pd.open');"
+                + "if(!open){var v=document.getElementById('video');"
+                + "open=!!v&&v.classList.contains('video-fs');}"
+                + "return open?'2':'0';}catch(e){return '0';}})()";
+        webView.evaluateJavascript(js, new ValueCallback<String>() {
+            @Override public void onReceiveValue(String value) {
+                if (value == null) { showBackDialog(); return; }
+                if (value.contains("1")) return;              // 网页已经关掉一层
+                if (value.contains("2")) {                    // 老服务端：补发 Esc 关掉它
+                    injectWebKey("Escape", "Escape", 27);
+                    return;
+                }
+                showBackDialog();                             // 主页顶层：弹原生菜单
+            }
+        });
     }
 
     @Override
@@ -2141,15 +2241,12 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
 
     private void handleMenuKey() {
         if (loginView != null && loginView.getVisibility() == View.VISIBLE) {
-            if (loginKeyboard != null) {
-                if (loginKeyboard.isVisible()) {
-                    loginKeyboard.setVisible(false);
-                    if (loginBtn != null) loginBtn.requestFocus();
-                } else {
-                    loginKeyboard.setVisible(true);
-                    loginKeyboard.refresh();
-                    loginKeyboard.focusFirst();
-                }
+            // 菜单键 = 屏幕键盘开关（1.2.4 起键盘是底部弹窗）
+            if (loginKbDialog != null && loginKbDialog.isShowing()) {
+                dismissLoginKeypad();
+                if (loginBtn != null) loginBtn.requestFocus();
+            } else {
+                showLoginKeypad(kbTarget == loginPass ? loginPass : loginUser);
             }
             return;
         }
@@ -2199,11 +2296,72 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
     }
 
     private void openLoginKeyboard(EditText target) {
-        if (loginKeyboard == null) return;
+        showLoginKeypad(target);
+    }
+
+    /**
+     * 登录页的屏幕键盘：底部弹出的大键盘，外观和服务器地址页的 showIpKeypad 一致
+     * （宽 980dp、按键 ×1.45、背后压暗）。1.2.4 之前它是内嵌在登录卡片下面的，
+     * 卡片一高键盘就被挤出屏幕外——电视上没法滚动，等于没有键盘。
+     */
+    private void showLoginKeypad(EditText target) {
+        if (target == null) target = loginUser;
+        if (target == null) return;
         setKbTarget(MODE_LOGIN, target);
-        loginKeyboard.setVisible(true);
+        if (loginKbDialog != null && loginKbDialog.isShowing()) {
+            if (loginKeyboard != null) {
+                loginKeyboard.refresh();
+                loginKeyboard.focusFirst();
+            }
+            return;
+        }
+        loginKeyboard = new TvKeyboard(this, this, false, true, true);
         loginKeyboard.refresh();
+
+        final Dialog d = new Dialog(this);
+        d.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        FrameLayout wrap = new FrameLayout(this);
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        int panelW = Math.min(screenW - dp(48), dp(980));
+        FrameLayout.LayoutParams plp = new FrameLayout.LayoutParams(panelW,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
+        plp.bottomMargin = dp(20);
+        wrap.addView(loginKeyboard.getView(), plp);
+        d.setContentView(wrap);
+        Window win = d.getWindow();
+        if (win != null) {
+            win.setBackgroundDrawable(new ColorDrawable(0x00000000));
+            win.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            win.setGravity(Gravity.BOTTOM);
+            win.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            WindowManager.LayoutParams lp = win.getAttributes();
+            lp.dimAmount = 0.55f;
+            win.setAttributes(lp);
+        }
+        d.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            @Override public void onDismiss(DialogInterface dialog) {
+                loginKbDialog = null;
+                loginKeyboard = null;
+                // 收起键盘后焦点回到刚编辑的输入框，再按 OK 还能叫出来
+                if (loginView != null && loginView.getVisibility() == View.VISIBLE) {
+                    if (kbTarget == loginUser || kbTarget == loginPass) kbTarget.requestFocus();
+                    else if (loginUser != null) loginUser.requestFocus();
+                }
+            }
+        });
+        loginKbDialog = d;
+        d.show();
         loginKeyboard.focusFirst();
+    }
+
+    private void dismissLoginKeypad() {
+        Dialog d = loginKbDialog;
+        loginKbDialog = null;
+        loginKeyboard = null;
+        if (d != null && d.isShowing()) {
+            try { d.dismiss(); } catch (Exception ignored) {}
+        }
     }
 
     @Override
@@ -2272,32 +2430,32 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
             // "完成"当作"下一项"用：先账号、再密码、最后提交，
             // 遥控器只需要反复按 OK，不用在键盘和按钮之间来回找焦点。
             if (kbTarget == loginUser && p.isEmpty()) {
-                openLoginKeyboard(loginPass);
+                showLoginKeypad(loginPass);
                 return;
             }
             if (u.isEmpty()) {
-                openLoginKeyboard(loginUser);
+                showLoginKeypad(loginUser);
                 return;
             }
             if (p.isEmpty()) {
-                openLoginKeyboard(loginPass);
+                showLoginKeypad(loginPass);
                 return;
             }
+            dismissLoginKeypad();
             if (loginBtn != null) loginBtn.requestFocus();
             doLogin();
             return;
         }
+        dismissLoginKeypad();
         if (loginBtn != null) loginBtn.requestFocus();
         doLogin();
     }
 
     @Override
     public void kbSwitch() {
-        if (kbMode != MODE_LOGIN || loginKeyboard == null) return;
-        if (kbTarget == loginUser) loginPass.requestFocus();
-        else loginUser.requestFocus();
-        loginKeyboard.setVisible(true);
-        loginKeyboard.refresh();
+        if (kbMode != MODE_LOGIN) return;
+        // 账号密码两个输入框来回切：标题和预览跟着变，键盘本身不动
+        showLoginKeypad(kbTarget == loginUser ? loginPass : loginUser);
     }
 
     @Override
@@ -2306,14 +2464,12 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
             if (ipDialog != null && ipDialog.isShowing()) ipDialog.dismiss();
             return;
         }
-        if (loginKeyboard != null) {
-            loginKeyboard.setVisible(false);
-            if (loginBtn != null) loginBtn.requestFocus();
-        }
+        dismissLoginKeypad();
+        if (loginBtn != null) loginBtn.requestFocus();
     }
 
     private void refreshKb() {
-        if (loginKeyboard != null && loginKeyboard.isVisible()) loginKeyboard.refresh();
+        if (loginKeyboard != null) loginKeyboard.refresh();
         if (ipKeyboard != null) ipKeyboard.refresh();
     }
 
@@ -2357,6 +2513,18 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         if (ipDialog != null) {
             try { ipDialog.dismiss(); } catch (Exception ignored) {}
             ipDialog = null;
+        }
+        if (loginKbDialog != null) {
+            try { loginKbDialog.dismiss(); } catch (Exception ignored) {}
+            loginKbDialog = null;
+        }
+        if (phoneDialog != null) {
+            try { phoneDialog.dismiss(); } catch (Exception ignored) {}
+            phoneDialog = null;
+        }
+        if (phoneServer != null) {
+            try { phoneServer.stop(); } catch (Exception ignored) {}
+            phoneServer = null;
         }
         if (webView != null) {
             try { webView.loadUrl("about:blank"); } catch (Exception ignored) {}

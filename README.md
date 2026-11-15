@@ -17,7 +17,7 @@
 - **曲库管理**：支持本地目录与网盘挂载目录混合曲库，后台可视化管理来源、批量清理孤儿曲目、文件名智能解析、歌手头像自动匹配、多歌手分隔符可配置（默认 `&`，可在后台「设置 → 多歌手」切换）
 - **硬件转码**：自动探测并使用 VAAPI（Intel/AMD 核显）或 NVENC（NVIDIA 显卡）硬件加速转码，无对应硬件时自动回退软件编码
 - **管理后台**：曲库来源管理、终端设备管理、转码缓存清理策略配置，全部网页端可视化操作
-- **电视 APK**：提供电视盒子/投影仪安装包，WebView 加载网页大屏端；首次启动自动搜索同网段 KTV 服务，原生登录 + 遥控器屏幕键盘，支持方向键/OK/返回/菜单操作
+- **电视 APK**：提供电视盒子/投影仪安装包，WebView 加载网页大屏端；首次启动自动搜索同网段 KTV 服务，原生登录（遥控器屏幕键盘 + 手机扫码填账号密码），返回键先在网页内回上一页、只在主页顶层才弹退出菜单，支持方向键/OK/返回/菜单操作
 
 ---
 
@@ -28,18 +28,18 @@
 | 大屏播放主页面 | `/tv` | 电视/投影仪打开，K歌主界面 |
 | 手机遥控端 | `/m` | 手机扫码打开，点歌与遥控 |
 | 管理后台 | `/admin` | 曲库、设备、缓存等后台管理 |
-| 电视 APK | `潇洒K歌-TV播放端-v1.2.3.apk` | 电视盒子/投影仪安装，WebView 加载 `/tv`；老内核自动切 `/tv_old` 兼容页，原生登录 + 自动发现服务器 |
+| 电视 APK | `潇洒K歌-TV播放端-v1.2.4.apk` | 电视盒子/投影仪安装，WebView 加载 `/tv`；老内核自动切 `/tv_old` 兼容页，原生登录 + 自动发现服务器 |
 | 老内核兼容大屏页 | `/tv_old` | 给 Chrome/52 这类老电视盒子用的兼容版，功能同 `/tv`，由 APK 自动选择 |
 
 浏览器打开服务器地址（如 `http://局域网IP:8083`）会看到一个导航首页，三个入口一目了然。
 
 ### 电视盒子 / 投影仪 APK
 
-如果不想用电视浏览器，可以直接安装 `潇洒K歌-TV播放端-v1.2.3.apk`：
+如果不想用电视浏览器，可以直接安装 `潇洒K歌-TV播放端-v1.2.4.apk`：
 
 - 首次启动自动扫描本机网段的 8083 端口，并显示本机 IP / 网关；本机网段找不到时会再扩大搜索 `192.168.0/1`、`10.0.0` 等常见网段。仍找不到可手动输入 `http://服务器IP:8083`。
-- 登录改成 **APK 原生登录页**，不再依赖电视盒子的网页登录页和系统输入法：自带遥控器屏幕键盘，方向键选字、OK 输入。老盒子也能登录。
-- 遥控器：方向键移动焦点，OK 确认；返回键先关闭网页弹层，再弹出「继续观看 / 服务器设置 / 退出」；菜单键打开服务器设置 / 屏幕键盘。
+- 登录改成 **APK 原生登录页**，不再依赖电视盒子的网页登录页和系统输入法：选中账号/密码框按 OK 弹出底部大键盘（支持大小写和符号层），也可以点「手机输入」用手机扫码填账号密码。老盒子也能登录。
+- 遥控器：方向键移动焦点，OK 确认；**返回键先在网页里回上一页**（关掉点歌/榜单/搜索等面板、退出全屏演唱页），只有退到主页顶层才弹出「继续观看 / 服务器设置 / 退出」；菜单键打开服务器设置 / 屏幕键盘。
 - APK 要求 Android 5.1+；系统 WebView **< Chrome/60** 时自动加载兼容页 `/tv_old`（功能同 `/tv`，JS 已转译、CSS Grid 换成 flex），**>=60** 加载完整 `/tv`。Chrome/52 的老盒子不用再折腾 WebView；如果兼容页也跑不起来，会显示当前版本和升级建议。
 - HLS 和二维码库随服务端本地提供，局域网内不依赖公网 CDN。
 - 源码在 `android-player/`，重新构建见 `android-player/README.md`。
@@ -110,10 +110,10 @@ docker compose ps             # 状态，Up (healthy) 表示健康检查通过
 
 **A. 直接用已发布的镜像（最快，推荐）**
 
-`andersonfeng/xiaosa-ktv:1.3.3`（amd64，约 570MB）已经发布在 Docker Hub，目标机器只要 `docker-compose.release.yml` + `.env`：
+`andersonfeng/xiaosa-ktv:1.3.4`（amd64，约 570MB）已经发布在 Docker Hub，目标机器只要 `docker-compose.release.yml` + `.env`：
 
 ```bash
-docker pull andersonfeng/xiaosa-ktv:1.3.3
+docker pull andersonfeng/xiaosa-ktv:1.3.4
 docker compose -f docker-compose.release.yml up -d
 ```
 
@@ -127,7 +127,7 @@ docker compose up -d --build
 
 **C. 用 GitHub Actions 自动构建（本机不用装 Docker）**
 
-`.github/workflows/docker-publish.yml` 已经配好：push 到 `main`/`master` 或打 `v1.3.3` 这样的 tag，GitHub 会自动构建 amd64 镜像，**一次构建同时推两个仓库**：
+`.github/workflows/docker-publish.yml` 已经配好：push 到 `main`/`master` 或打 `v1.3.4` 这样的 tag，GitHub 会自动构建 amd64 镜像，**一次构建同时推两个仓库**：
 
 - **ghcr.io/andersonfeng/xiaosa-ktv** —— 用仓库自带的 `GITHUB_TOKEN`，不需要额外配置
 - **andersonfeng/xiaosa-ktv**（Docker Hub）—— 需要在仓库 Settings → Secrets and variables → Actions 里配 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`（Docker Hub 后台 → Account settings → Security → New access token，勾 Read & Write）；没配时自动只推 GHCR，不会让 CI 变红
@@ -148,8 +148,8 @@ docker compose -f docker-compose.release.yml up -d
 **C. 手动构建并推送镜像**（本机/服务器上装了 Docker）：
 
 ```bash
-docker build -t andersonfeng/xiaosa-ktv:1.3.3 ./app/docker
-docker push andersonfeng/xiaosa-ktv:1.3.3        # 需要先 docker login
+docker build -t andersonfeng/xiaosa-ktv:1.3.4 ./app/docker
+docker push andersonfeng/xiaosa-ktv:1.3.4        # 需要先 docker login
 ```
 
 目标机器只要 `docker-compose.release.yml` + `.env` 两个文件：
@@ -167,7 +167,7 @@ docker load -i xiaosa-ktv.tar                      # 目标机
 docker compose -f docker-compose.release.yml up -d
 ```
 
-> release 文件里的镜像名默认是 `andersonfeng/xiaosa-ktv:1.3.3`，可用 `.env` 的 `KTV_IMAGE` 覆盖。
+> release 文件里的镜像名默认是 `andersonfeng/xiaosa-ktv:1.3.4`，可用 `.env` 的 `KTV_IMAGE` 覆盖。
 
 ### 6. fnOS / 群晖等套件安装
 

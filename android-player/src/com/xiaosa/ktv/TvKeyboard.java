@@ -54,9 +54,14 @@ final class TvKeyboard {
     private boolean numeric;
     /** 大按键模式：电视上专门给"服务器地址"用，键和字都放大一圈。 */
     private final boolean bigKeys;
+    /** 登录用键盘：多一个「切换账号/密码」和「符号」层；地址键盘不需要这两样。 */
+    private final boolean forLogin;
+    private LinearLayout lettersBox;
+    private LinearLayout symbolBox;
+    private Button symbolToggle;
 
     TvKeyboard(Context context, Host host, boolean numeric) {
-        this(context, host, numeric, false);
+        this(context, host, numeric, false, false);
     }
 
     /**
@@ -65,18 +70,25 @@ final class TvKeyboard {
      *                在 3 米外看几乎没法用遥控器瞄准。
      */
     TvKeyboard(Context context, Host host, boolean numeric, boolean bigKeys) {
+        this(context, host, numeric, bigKeys, false);
+    }
+
+    /**
+     * @param forLogin 账号/密码输入用：标题栏多一个「切换账号/密码」按钮，
+     *                 底部功能行上方可以切一层「符号」——密码里常有 !@#%
+     *                 这类字符，纯字母数字键盘敲不出来。
+     *                 服务器地址键盘用不到这两样，传 false。
+     */
+    TvKeyboard(Context context, Host host, boolean numeric, boolean bigKeys, boolean forLogin) {
         this.ctx = context;
         this.host = host;
         this.numeric = numeric;
         this.bigKeys = bigKeys;
+        this.forLogin = forLogin;
         this.panel = build();
     }
 
     View getView() { return panel; }
-
-    void setVisible(boolean visible) { panel.setVisibility(visible ? View.VISIBLE : View.GONE); }
-
-    boolean isVisible() { return panel.getVisibility() == View.VISIBLE; }
 
     void refresh() {
         if (labelView != null) labelView.setText(host.kbLabel());
@@ -131,7 +143,22 @@ final class TvKeyboard {
         valueView.setPadding(dp(10), 0, dp(10), 0);
         header.addView(valueView, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
 
-        if (!numeric) {
+        // 1.2.4：「符号」切换只给登录键盘；地址键盘（forLogin=false）不显示，
+        // 免得出现一个按了没反应的按钮。
+        if (!numeric && forLogin) {
+            symbolToggle = makeKey("符号", 13, dp(34), false);
+            symbolToggle.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { toggleSymbols(); }
+            });
+            LinearLayout.LayoutParams ylp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(34));
+            ylp.rightMargin = dp(8);
+            header.addView(symbolToggle, ylp);
+        }
+
+        // 1.2.3 的地址键盘（numeric=false）也进了这个分支，标题栏上会多出一个
+        // 毫无意义的「切换账号/密码」按钮；改成看 forLogin。
+        if (!numeric && forLogin) {
             Button switchBtn = makeKey("切换账号/密码", 13, dp(34), false);
             switchBtn.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) { host.kbSwitch(); refresh(); }
@@ -144,10 +171,7 @@ final class TvKeyboard {
 
         Button closeBtn = makeKey(numeric || bigKeys ? "取消" : "收起", 13, dp(34), false);
         closeBtn.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                if (!numeric && !bigKeys) setVisible(false);
-                host.kbClose();
-            }
+            @Override public void onClick(View v) { host.kbClose(); }
         });
 
         header.addView(closeBtn, new LinearLayout.LayoutParams(
@@ -165,10 +189,24 @@ final class TvKeyboard {
     }
 
     private void buildFull(LinearLayout root) {
-        addRow(root, new String[]{"1","2","3","4","5","6","7","8","9","0"}, true);
-        addRow(root, new String[]{"q","w","e","r","t","y","u","i","o","p"}, true);
-        addRow(root, new String[]{"a","s","d","f","g","h","j","k","l"}, true);
-        addRow(root, new String[]{"z","x","c","v","b","n","m",".","-","_"}, true);
+        // 字母/数字层和符号层做成两个等高容器，切换时只切显示，键盘总高度不变
+        // （高度一变，底部弹出的键盘会整个往上跳一截）。
+        lettersBox = newBox();
+        addRow(lettersBox, new String[]{"1","2","3","4","5","6","7","8","9","0"}, true);
+        addRow(lettersBox, new String[]{"q","w","e","r","t","y","u","i","o","p"}, true);
+        addRow(lettersBox, new String[]{"a","s","d","f","g","h","j","k","l"}, true);
+        addRow(lettersBox, new String[]{"z","x","c","v","b","n","m",".","-","_"}, true);
+        root.addView(lettersBox, boxParams());
+
+        if (forLogin) {
+            symbolBox = newBox();
+            addSymbolRow(symbolBox, new String[]{"!","@","#","$","%","^","&","*","(",")"});
+            addSymbolRow(symbolBox, new String[]{"-","_","=","+","[","]","{","}",";",":"});
+            addSymbolRow(symbolBox, new String[]{"'","\"",",",".","/","\\","|","~","?"});
+            addSymbolRow(symbolBox, new String[]{"1","2","3","4","5","6","7","8","9","0"});
+            symbolBox.setVisibility(View.GONE);
+            root.addView(symbolBox, boxParams());
+        }
 
         // 最后一行：Shift / @ / : / 空格 / 退格 / 清空 / 完成
         LinearLayout row = newRow();
@@ -298,6 +336,38 @@ final class TvKeyboard {
             @Override public void onClick(View v) { host.kbChar(sym); refresh(); }
         });
         row.addView(b, weight(weight));
+    }
+
+    /** 符号层的一整行：直接往容器里加按键，不需要标签/大小写这些附加状态。 */
+    private void addSymbolRow(LinearLayout box, String[] syms) {
+        LinearLayout row = newRow();
+        for (final String s : syms) {
+            Button b = makeKey(s, 20, dp(42), false);
+            b.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { host.kbChar(s); refresh(); }
+            });
+            row.addView(b, weight(1));
+        }
+        box.addView(row, rowParams());
+    }
+
+    private LinearLayout newBox() {
+        LinearLayout box = new LinearLayout(ctx);
+        box.setOrientation(LinearLayout.VERTICAL);
+        return box;
+    }
+
+    private LinearLayout.LayoutParams boxParams() {
+        return new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+
+    private void toggleSymbols() {
+        if (symbolBox == null || lettersBox == null) return;
+        boolean toSymbols = lettersBox.getVisibility() == View.VISIBLE;
+        lettersBox.setVisibility(toSymbols ? View.GONE : View.VISIBLE);
+        symbolBox.setVisibility(toSymbols ? View.VISIBLE : View.GONE);
+        if (symbolToggle != null) symbolToggle.setText(toSymbols ? "字母" : "符号");
     }
 
     private LinearLayout newRow() {
