@@ -45,6 +45,7 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
@@ -123,12 +124,15 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
     private Button searchBtn;
     private Button connectBtn;
     private Button cancelBtn;
+    private Button phoneBtn;
     private Button loginBtn;
     private Button keyboardBtn;
 
     private TvKeyboard loginKeyboard;
     private TvKeyboard ipKeyboard;
     private Dialog ipDialog;
+    private Dialog phoneDialog;
+    private PhoneInputServer phoneServer;
     private int kbMode = MODE_NONE;
     private EditText kbTarget;
 
@@ -1202,35 +1206,42 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         setupNetInfo.setPadding(dp(2), 0, 0, dp(12));
         card.addView(setupNetInfo);
 
+        // 第一行：屏幕键盘 | 手机输入 | 连接
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
-        searchBtn = makeButton("自动搜索", false);
+        Button kbBtn = makeButton("屏幕键盘", false);
+        phoneBtn = makeButton("手机输入", false);
         connectBtn = makeButton("连接", true);
-        searchBtn.setId(View.generateViewId());
+        kbBtn.setId(View.generateViewId());
+        phoneBtn.setId(View.generateViewId());
         connectBtn.setId(View.generateViewId());
         LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(0, dp(54), 1);
         lp1.rightMargin = dp(10);
-        row.addView(searchBtn, lp1);
+        row.addView(kbBtn, lp1);
+        LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(0, dp(54), 1);
+        lp2.rightMargin = dp(10);
+        row.addView(phoneBtn, lp2);
         row.addView(connectBtn, new LinearLayout.LayoutParams(0, dp(54), 1));
         card.addView(row, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
+        // 第二行：自动搜索 | 退出应用 | 返回
         LinearLayout row2 = new LinearLayout(this);
         row2.setOrientation(LinearLayout.HORIZONTAL);
         row2.setPadding(0, dp(14), 0, 0);
-        cancelBtn = makeButton("返回", false);
-        Button kbBtn = makeButton("屏幕键盘", false);
+        searchBtn = makeButton("自动搜索", false);
         Button exitBtn = makeButton("退出应用", false);
-        cancelBtn.setId(View.generateViewId());
-        kbBtn.setId(View.generateViewId());
+        cancelBtn = makeButton("返回", false);
+        searchBtn.setId(View.generateViewId());
         exitBtn.setId(View.generateViewId());
-        LinearLayout.LayoutParams lp2 = new LinearLayout.LayoutParams(0, dp(48), 1);
-        lp2.rightMargin = dp(8);
-        row2.addView(cancelBtn, lp2);
+        cancelBtn.setId(View.generateViewId());
         LinearLayout.LayoutParams lp3 = new LinearLayout.LayoutParams(0, dp(48), 1);
         lp3.rightMargin = dp(8);
-        row2.addView(kbBtn, lp3);
-        row2.addView(exitBtn, new LinearLayout.LayoutParams(0, dp(48), 1));
+        row2.addView(searchBtn, lp3);
+        LinearLayout.LayoutParams lp4 = new LinearLayout.LayoutParams(0, dp(48), 1);
+        lp4.rightMargin = dp(8);
+        row2.addView(exitBtn, lp4);
+        row2.addView(cancelBtn, new LinearLayout.LayoutParams(0, dp(48), 1));
         card.addView(row2, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
@@ -1249,6 +1260,9 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         kbBtn.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { showIpKeypad(); }
         });
+        phoneBtn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { showPhoneInput(); }
+        });
         serverInput.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
                 if (actionId == EditorInfo.IME_ACTION_GO ||
@@ -1265,14 +1279,22 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
             }
         });
 
-        // 遥控器焦点顺序：地址框 → 自动搜索 → 连接；返回/键盘/退出在下一行。
-        serverInput.setNextFocusDownId(searchBtn.getId());
-        searchBtn.setNextFocusRightId(connectBtn.getId());
-        connectBtn.setNextFocusLeftId(searchBtn.getId());
-        searchBtn.setNextFocusUpId(serverInput.getId());
+        // 遥控器焦点顺序：地址框 → 第一行（屏幕键盘/手机输入/连接）→ 第二行（自动搜索/退出应用/返回）
+        serverInput.setNextFocusDownId(kbBtn.getId());
+        kbBtn.setNextFocusRightId(phoneBtn.getId());
+        phoneBtn.setNextFocusRightId(connectBtn.getId());
+        phoneBtn.setNextFocusLeftId(kbBtn.getId());
+        connectBtn.setNextFocusLeftId(phoneBtn.getId());
+        kbBtn.setNextFocusUpId(serverInput.getId());
+        phoneBtn.setNextFocusUpId(serverInput.getId());
         connectBtn.setNextFocusUpId(serverInput.getId());
+        searchBtn.setNextFocusUpId(kbBtn.getId());
+        exitBtn.setNextFocusUpId(phoneBtn.getId());
         cancelBtn.setNextFocusUpId(connectBtn.getId());
-        kbBtn.setNextFocusUpId(connectBtn.getId());
+        searchBtn.setNextFocusRightId(exitBtn.getId());
+        exitBtn.setNextFocusRightId(cancelBtn.getId());
+        exitBtn.setNextFocusLeftId(searchBtn.getId());
+        cancelBtn.setNextFocusLeftId(exitBtn.getId());
 
         root.addView(frame, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
@@ -1397,6 +1419,122 @@ public class MainActivity extends Activity implements TvKeyboard.Host {
         ipDialog = d;
         d.show();
         ipKeyboard.focusFirst();
+    }
+
+    /**
+     * 「手机输入」：电视右上角弹一个二维码，手机扫码打开页面输入服务器地址，
+     * 提交后电视自动填进地址框。
+     *
+     * 前提是电视已经连上局域网（二维码里就是电视自己的 IP:端口），所以它适合
+     * "换服务器地址"，不适合全新电视的第一次配置——那种情况电视还没网、
+     * 二维码指向的地址打不开，还是得用屏幕键盘或自动搜索。
+     */
+    private void showPhoneInput() {
+        if (serverInput == null) return;
+        if (phoneDialog != null && phoneDialog.isShowing()) return;
+        if (localIp == null) scanLocalNetworks();
+        if (localIp == null) {
+            setupStatus.setText("电视还没联网，拿不到本机 IP，暂时不能用手机输入；可以先用屏幕键盘");
+            return;
+        }
+
+        phoneServer = new PhoneInputServer(new PhoneInputServer.Listener() {
+            @Override public void onAddress(final String address) {
+                // 回调在网络线程，UI 操作必须切回主线程
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (phoneDialog != null) {
+                            phoneDialog.dismiss();
+                            phoneDialog = null;
+                        }
+                        if (serverInput != null) serverInput.setText(address);
+                        setupStatus.setText("手机已发送地址：" + address + "，确认无误后点「连接」");
+                    }
+                });
+            }
+        });
+        final String url = phoneServer.start(localIp);
+        if (url == null) {
+            phoneServer = null;
+            setupStatus.setText("手机输入服务启动失败：8098~8108 端口都被占用了");
+            return;
+        }
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(16), dp(14), dp(16), dp(12));
+        card.setBackground(roundRect(0xF2141430, 18, 0x66FFFFFF));
+
+        TextView title = new TextView(this);
+        title.setText("手机扫码输入");
+        title.setTextColor(0xFFF4F4FF);
+        title.setTextSize(16);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        card.addView(title);
+
+        TextView sub = new TextView(this);
+        sub.setText("手机和电视连同一个 WiFi，扫码后输入服务器地址");
+        sub.setTextColor(0xFFB8B8D8);
+        sub.setTextSize(11);
+        sub.setLineSpacing(dp(1), 1f);
+        sub.setPadding(0, dp(4), 0, dp(10));
+        card.addView(sub);
+
+        ImageView qrView = new ImageView(this);
+        qrView.setImageBitmap(QrBitmap.render(QrCode.encode(url), dp(190)));
+        qrView.setAdjustViewBounds(true);
+        LinearLayout.LayoutParams qlp = new LinearLayout.LayoutParams(dp(190), dp(190));
+        qlp.gravity = Gravity.CENTER_HORIZONTAL;
+        card.addView(qrView, qlp);
+
+        TextView urlView = new TextView(this);
+        urlView.setText(url);
+        urlView.setTextColor(0xFF36D9F7);
+        urlView.setTextSize(12);
+        urlView.setGravity(Gravity.CENTER);
+        urlView.setPadding(0, dp(8), 0, dp(10));
+        card.addView(urlView);
+
+        Button close = makeButton("关闭", false);
+        close.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (phoneDialog != null) phoneDialog.dismiss();
+            }
+        });
+        close.setId(View.generateViewId());
+        card.addView(close, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(40)));
+
+        final Dialog d = new Dialog(this);
+        d.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        FrameLayout wrap = new FrameLayout(this);
+        int screenW = getResources().getDisplayMetrics().widthPixels;
+        int cardW = Math.min(screenW - dp(40), dp(300));
+        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(cardW,
+                ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.END);
+        clp.topMargin = dp(20);
+        clp.rightMargin = dp(20);
+        wrap.addView(card, clp);
+        d.setContentView(wrap);
+        Window win = d.getWindow();
+        if (win != null) {
+            win.setBackgroundDrawable(new ColorDrawable(0x00000000));
+            win.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
+            win.setGravity(Gravity.TOP | Gravity.END);
+            // 刻意不加 FLAG_DIM_BEHIND：不压暗背景，二维码贴在右上角，左边的地址/按钮照样看得见
+        }
+        d.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            @Override public void onDismiss(DialogInterface dialog) {
+                phoneDialog = null;
+                if (phoneServer != null) {
+                    phoneServer.stop();
+                    phoneServer = null;
+                }
+                if (serverInput != null) serverInput.requestFocus();
+            }
+        });
+        phoneDialog = d;
+        d.show();
     }
 
     // ------------------------------------------------------------ 连接/发现
