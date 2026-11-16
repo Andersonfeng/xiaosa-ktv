@@ -6,14 +6,15 @@
 #                                          没配的时候自动只推 GHCR，不会让 CI 变红
 #
 # 触发方式（2026-11 起：只在打版本 tag 时构建）：
-#   - push 形如 v1.3.7 的 tag：构建 amd64 镜像，推 1.3.7 / 1.3 / latest
+#   - push 形如 v1.3.7 的 tag：构建 amd64 镜像，推 1.3.7 / latest
 #   - 也可以在 Actions 页面手动 Run workflow
 #   - push 到 main / master 不再触发构建（省 CI，也避免仓库里出现分支名标签）
 #
 # 关于标签：以前有一条 type=ref,event=branch，会把分支名当成镜像标签，于是每发一版
-# 都会多出一个 `master` 标签，和 latest 内容重复。已经删掉，现在只会出现：
-#   打 vX.Y.Z → X.Y.Z、X.Y、latest
-# 已经推到仓库里的旧 master 标签不会自动消失，需要手动删（见 README）。
+# 都会多出一个 `master` 标签，和 latest 内容重复；还有一条 {{major}}.{{minor}}，
+# 会多推一个 `1.3`。两条都已删掉，现在只会出现：
+#   打 vX.Y.Z → X.Y.Z、latest
+# 已经推到仓库里的旧 master / 1.3 标签不会自动消失，需要手动删（见 README）。
 
 name: Build and push image
 
@@ -91,12 +92,11 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ steps.targets.outputs.images }}
-          # 不再用 type=ref,event=branch：那会给每个分支打一个同名标签
-          # （master/main），内容跟 latest 完全一样，纯属仓库里的噪音。
-          # 只在 tag 上构建（见文件顶部 on:），所以 latest 直接无条件跟着版本走。
+          # 只出两个标签：当前版本号 + latest（原来还有一条 {{major}}.{{minor}}，
+          # 会额外推一个 1.3，和 1.3.7 同内容，已经去掉）。
+          # 也不再给分支打同名标签（type=ref,event=branch 会推出 master）。
           tags: |
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
 
       - name: Build and push

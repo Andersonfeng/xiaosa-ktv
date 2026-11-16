@@ -232,6 +232,8 @@ html,body{width:100%;height:100%;width:100vw;height:100vh;overflow:hidden;backgr
   animation:vlSpin .8s linear infinite}
 @keyframes vlSpin{to{transform:rotate(360deg)}}
 .vl-text{font-size:17px;color:rgba(255,255,255,.6);letter-spacing:1px}
+/* 1.3.7：加载卡住时的自救提示（第二行，小一号、更暗，不喧宾夺主）。 */
+.vl-hint{font-size:13px;color:rgba(255,255,255,.4);letter-spacing:.5px;margin-top:-8px}
 /* 需求(MV加载动画下方显示下载速度/预计等待时长)：网盘/STRM点歌，播放前
    要先把源文件缓存到本地(见 server/sourceCache.js)，网速慢的时候这一步
    可能要等不短的时间——以前"加载中"转圈完全是黑盒，用户只能干等，猜不到
@@ -741,7 +743,7 @@ html[data-layout="mobile"] #footer{padding:4px 12px 8px}
     <div id="now-col">
       <div id="now-panel" data-f onclick="enterFullscreen()">
         <video id="ktv-video" class="video-home" playsinline></video>
-        <div id="video-loading"><div class="vl-spinner"></div><div class="vl-text">加载中…</div><div class="vl-net" id="vl-net"><div class="vl-net-speed" id="vl-net-speed">下载中…</div><div class="vl-net-eta" id="vl-net-eta"></div></div></div>
+        <div id="video-loading"><div class="vl-spinner"></div><div class="vl-text">还在加载，稍等一下…</div><div class="vl-hint">卡住了就按「重唱」刷新</div><div class="vl-net" id="vl-net"><div class="vl-net-speed" id="vl-net-speed">下载中…</div><div class="vl-net-eta" id="vl-net-eta"></div></div></div>
         <div id="now-idle"><div class="idle-big"><img src="/shared/logo.png" alt="潇洒K歌"></div><div class="idle-sub">扫码点歌 · 大屏沉浸演唱</div></div>
         <div id="now-info"><div class="ni-t" id="ni-title">—</div><div class="ni-m" id="ni-meta">—</div></div>
       </div>
@@ -1558,7 +1560,12 @@ function renderAll(){
     document.getElementById('ni-meta').textContent=`${playing.artist||''} · ${playing.nickname}`;
     document.getElementById('ov-title').textContent=playing.title;
     document.getElementById('ov-artist').textContent=`${playing.artist||''} · ${playing.nickname}`;
-    if(!curSong||curSong.queue_id!==playing.queue_id){curSong=playing;loadSong(video,playing.song_id,!!(playing.is_network||playing.is_strm));}
+    if(!curSong||curSong.queue_id!==playing.queue_id){
+      // 1.3.7：开始播一首新歌时清掉暂停态（用户暂停后队列自动切到下一首、
+      // 或从后台回来时，不该因为残留的 isPaused 而不调用 play()）。
+      isPaused=false;
+      curSong=playing;loadSong(video,playing.song_id,!!(playing.is_network||playing.is_strm));
+    }
   }else{document.getElementById('now-idle').style.display='flex';video.style.display='none';document.getElementById('now-info').classList.remove('show');document.getElementById('video-loading').classList.remove('show');stopCacheProgressPoll();hideToast();curSong=null;destroyHls();video.removeAttribute('src');video.load();document.getElementById('next-up-bar').classList.remove('show');
     if(isFS)exitKtvFullscreen();}
 }

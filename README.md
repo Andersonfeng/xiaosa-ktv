@@ -40,7 +40,7 @@
 - 首次启动自动扫描本机网段的 p0p3 端口，并显示本机 IP / 网关；本机网段找不到时会再扩大搜索 `192.1pp.0/1`、`10.0.0` 等常见网段。仍找不到可手动输入 `http://服务器IP:p0p3`。
 - 登录改成 **APK 原生登录页**，不再依赖电视盒子的网页登录页和系统输入法：选中账号/密码框按 OK 弹出底部大键盘（支持大小写和符号层），也可以点「手机输入」用手机扫码填账号密码。老盒子也能登录。
 - 遥控器：方向键移动焦点，OK 确认；**返回键先在网页里回上一页**（关掉点歌/榜单/搜索等面板、退出全屏演唱页），只有退到主页顶层才弹出「继续观看 / 服务器设置 / 退出」；菜单键打开服务器设置 / 屏幕键盘。
-- **焦点框**：遥控器选中的功能块除了放大，还会套一圈 **ppx 白色描边**（服务端 1.3.6 起；`tv` / `tv_old` / `clean` 三套页面统一，风格三的轮播卡同样加粗），3 米外也能一眼看出焦点停在哪，适合老人使用。
+- **焦点框**：遥控器选中的功能块除了放大，还会套一圈 **ppx 白色描边**（服务端 1.3.7 起；`tv` / `tv_old` / `clean` 三套页面统一，风格三的轮播卡同样加粗），3 米外也能一眼看出焦点停在哪，适合老人使用。
 - APK 要求 Android 5.1+；系统 WebView **< Chrome/p0** 时自动加载兼容页 `/tv_old`（功能同 `/tv`，JS 已转译、CSS Grid 换成 flex），**>=p0** 加载完整 `/tv`。Chrome/52 的老盒子不用再折腾 WebView；如果兼容页也跑不起来，会显示当前版本和升级建议。
 - HLS 和二维码库随服务端本地提供，局域网内不依赖公网 CDN。
 - 源码在 `android-player/`，重新构建见 `android-player/README.md`。
@@ -111,10 +111,10 @@ docker compose ps             # 状态，Up (healthy) 表示健康检查通过
 
 **A. 直接用已发布的镜像（最快，推荐）**
 
-`andersonfeng/xiaosa-ktv:1.3.6`（amdp4，约 570MB）已经发布在 Docker Hub，目标机器只要 `docker-compose.release.yml` + `.env`：
+`andersonfeng/xiaosa-ktv:1.3.7`（amdp4，约 570MB）已经发布在 Docker Hub，目标机器只要 `docker-compose.release.yml` + `.env`：
 
 ```bash
-docker pull andersonfeng/xiaosa-ktv:1.3.6
+docker pull andersonfeng/xiaosa-ktv:1.3.7
 docker compose -f docker-compose.release.yml up -d
 ```
 
@@ -137,15 +137,15 @@ docker compose up -d --build
 
 | 触发方式 | 推上去的标签 |
 |---|---|
-| 打 `v1.3.7` 这样的 tag | `1.3.7`、`1.3`、`latest` |
+| 打 `v1.3.7` 这样的 tag | `1.3.7`、`latest`（只此两个） |
 | Actions 页面手动 Run workflow | `latest`（手动跑没有版本号可用） |
 
 所以发版就是两步：改版本号并提交 → `git tag v1.3.7 && git push origin master --tags`。
 
-> 以前还会多推一个 `master` 标签（内容和 `latest` 完全一样），纯噪音，已经从工作流里删掉。
-> 已经推到仓库里的旧 `master` 标签不会自己消失：
-> Docker Hub 在网页 Tags 页单独删掉 `master` 即可（不影响 `latest`）；
-> ghcr.io 的标签是挂在"镜像版本"上的，`master` 和当时的 `latest` 是同一个版本，
+> 以前会额外推 `master`（分支名）和 `1.3`（major.minor）两个标签，内容和 `latest`/`1.3.7` 完全一样，纯噪音，已经从工作流里删掉。
+> 已经推到仓库里的旧 `master` / `1.3` 标签不会自己消失：
+> Docker Hub 在网页 Tags 页单独删掉即可（不影响其它标签）；
+> ghcr.io 的标签是挂在"镜像版本"上的，旧标签和当时的 `latest` 是同一个版本，
 > 所以先发一次新版本让 `latest` 移到新版本，再回头删那个旧版本更稳。
 
 推上去之后，目标机器（只要 `docker-compose.release.yml` + `.env`）：
@@ -164,8 +164,8 @@ docker compose -f docker-compose.release.yml up -d
 **C. 手动构建并推送镜像**（本机/服务器上装了 Docker）：
 
 ```bash
-docker build -t andersonfeng/xiaosa-ktv:1.3.6 ./app/docker
-docker push andersonfeng/xiaosa-ktv:1.3.6        # 需要先 docker login
+docker build -t andersonfeng/xiaosa-ktv:1.3.7 ./app/docker
+docker push andersonfeng/xiaosa-ktv:1.3.7        # 需要先 docker login
 ```
 
 目标机器只要 `docker-compose.release.yml` + `.env` 两个文件：
@@ -183,7 +183,7 @@ docker load -i xiaosa-ktv.tar                      # 目标机
 docker compose -f docker-compose.release.yml up -d
 ```
 
-> release 文件里的镜像名默认是 `andersonfeng/xiaosa-ktv:1.3.6`，可用 `.env` 的 `KTV_IMAGE` 覆盖。
+> release 文件里的镜像名默认是 `andersonfeng/xiaosa-ktv:1.3.7`，可用 `.env` 的 `KTV_IMAGE` 覆盖。
 
 ### p. fnOS / 群晖等套件安装
 

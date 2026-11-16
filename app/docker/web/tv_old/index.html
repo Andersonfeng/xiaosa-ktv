@@ -1018,6 +1018,9 @@ html[data-theme="2"] #home.home-hide{opacity:0;pointer-events:none;transition:op
   animation:vlSpin .8s linear infinite}
 @keyframes vlSpin{to{transform:rotate(360deg)}}
 .vl-text{font-size:17px;color:rgba(255,255,255,.6);letter-spacing:1px}
+/* 1.3.7：加载卡住时的自救提示（第二行，小一号、更暗，不喧宾夺主）。
+   正常加载（尤其网盘歌要缓存源文件）本来就要等，所以措辞是"卡住了再按"。 */
+.vl-hint{font-size:13px;color:rgba(255,255,255,.4);letter-spacing:.5px;margin-top:-8px}
 /* 需求(MV加载动画下方显示下载速度/预计等待时长)：网盘/STRM点歌，播放前
    要先把源文件缓存到本地(见 server/sourceCache.js)，网速慢的时候这一步
    可能要等不短的时间——以前"加载中"转圈完全是黑盒，用户只能干等，猜不到
@@ -2100,7 +2103,7 @@ html[data-layout="mobile"] .song-list-2col{grid-template-columns:1fr}
     <div id="now-col">
       <div id="now-panel" data-f onclick="handleNowPanelClick()">
         <video id="ktv-video" class="video-home" playsinline></video>
-        <div id="video-loading"><div class="vl-spinner"></div><div class="vl-text">加载中…</div><div class="vl-net" id="vl-net"><div class="vl-net-speed" id="vl-net-speed">下载中…</div><div class="vl-net-eta" id="vl-net-eta"></div></div></div>
+        <div id="video-loading"><div class="vl-spinner"></div><div class="vl-text">还在加载，稍等一下…</div><div class="vl-hint">卡住了就按「重唱」刷新</div><div class="vl-net" id="vl-net"><div class="vl-net-speed" id="vl-net-speed">下载中…</div><div class="vl-net-eta" id="vl-net-eta"></div></div></div>
         <div id="now-idle"><div class="idle-big"><img src="/shared/logo.png" alt="潇洒K歌"></div><div class="idle-sub">扫码点歌 · 大屏沉浸演唱</div></div>
         <div id="now-info"><div class="ni-t" id="ni-title">—</div><div class="ni-m" id="ni-meta">—</div></div>
         <div id="now-qr-corner"><div id="now-qr-code2"></div></div>
@@ -3782,6 +3785,13 @@ function renderAll() {
       document.getElementById("now-idle").style.display = "none";
       video.style.display = "block";
       if (!curSong || curSong.queue_id !== playing.queue_id) {
+        // 1.3.7 修复"每次打开 App 都卡在加载中，按一下重唱才播"：
+        // WS 连上时服务端按 queue → state → player_changed 的顺序推消息，
+        // 收到 state 时本页还没被认定为播放端，applyRemoteState() 会把服务端
+        // 缓存的 paused 抄进 isPaused；上次会话如果是暂停态，这里就是 true，
+        // 而 loadSong() 只在 !isPaused 时才 play()，于是遮罩一直挂着。
+        // "开始播一首新歌"本身就是播放语义，在这里清掉暂停态。
+        isPaused = false;
         curSong = playing;
         loadSong(video, playing.song_id, !!(playing.is_network || playing.is_strm));
         showSongIntro(playing.title, `${playing.artist || ""} · ${playing.nickname}`);
