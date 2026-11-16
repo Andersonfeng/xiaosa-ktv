@@ -128,7 +128,7 @@ docker compose up -d --build
 
 **C. 用 GitHub Actions 自动构建（本机不用装 Docker）**
 
-`.github/workflows/docker-publish.yml` 已经配好：push 到 `main`/`master` 或打 `v1.3.6` 这样的 tag，GitHub 会自动构建 amd64 镜像，**一次构建同时推两个仓库**：
+`.github/workflows/docker-publish.yml` 已经配好：**只有打 `v1.3.7` 这样的 tag 才会构建**（push 到 master 不再触发），GitHub 自动构建 amd64 镜像，**一次构建同时推两个仓库**：
 
 - **ghcr.io/andersonfeng/xiaosa-ktv** —— 用仓库自带的 `GITHUB_TOKEN`，不需要额外配置
 - **andersonfeng/xiaosa-ktv**（Docker Hub）—— 需要在仓库 Settings → Secrets and variables → Actions 里配 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`（Docker Hub 后台 → Account settings → Security → New access token，勾 Read & Write）；没配时自动只推 GHCR，不会让 CI 变红
@@ -137,8 +137,10 @@ docker compose up -d --build
 
 | 触发方式 | 推上去的标签 |
 |---|---|
-| push 到 `master`（或 `main`） | `latest` |
-| 打 `v1.3.6` 这样的 tag | `1.3.6`、`1.3` |
+| 打 `v1.3.7` 这样的 tag | `1.3.7`、`1.3`、`latest` |
+| Actions 页面手动 Run workflow | `latest`（手动跑没有版本号可用） |
+
+所以发版就是两步：改版本号并提交 → `git tag v1.3.7 && git push origin master --tags`。
 
 > 以前还会多推一个 `master` 标签（内容和 `latest` 完全一样），纯噪音，已经从工作流里删掉。
 > 已经推到仓库里的旧 `master` 标签不会自己消失：

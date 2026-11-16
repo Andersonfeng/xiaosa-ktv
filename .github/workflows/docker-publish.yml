@@ -5,23 +5,20 @@
 #                                          DOCKERHUB_USERNAME / DOCKERHUB_TOKEN
 #                                          没配的时候自动只推 GHCR，不会让 CI 变红
 #
-# 触发方式：
-#   - push 到 main / master：构建 amd64 镜像，只打 latest（不再打 master 分支标签）
-#   - push 形如 v1.3.0 的 tag：额外打 1.3.0 / 1.3 语义化版本标签
+# 触发方式（2026-11 起：只在打版本 tag 时构建）：
+#   - push 形如 v1.3.7 的 tag：构建 amd64 镜像，推 1.3.7 / 1.3 / latest
 #   - 也可以在 Actions 页面手动 Run workflow
+#   - push 到 main / master 不再触发构建（省 CI，也避免仓库里出现分支名标签）
 #
-# 关于标签（2026-11 调整）：原来还有一条 type=ref,event=branch，会把分支名
-# 当成镜像标签，于是每发一版都会多出一个 `master` 标签，和 latest 内容重复、
-# 又容易让人误以为"master 是个版本"。已经删掉，现在只会出现：
-#   推 master（或 main）→ latest
-#   打 vX.Y.Z        → X.Y.Z、X.Y
+# 关于标签：以前有一条 type=ref,event=branch，会把分支名当成镜像标签，于是每发一版
+# 都会多出一个 `master` 标签，和 latest 内容重复。已经删掉，现在只会出现：
+#   打 vX.Y.Z → X.Y.Z、X.Y、latest
 # 已经推到仓库里的旧 master 标签不会自动消失，需要手动删（见 README）。
 
 name: Build and push image
 
 on:
   push:
-    branches: [main, master]
     tags: ['v*']
   workflow_dispatch:
 
@@ -96,12 +93,11 @@ jobs:
           images: ${{ steps.targets.outputs.images }}
           # 不再用 type=ref,event=branch：那会给每个分支打一个同名标签
           # （master/main），内容跟 latest 完全一样，纯属仓库里的噪音。
-          # latest 只跟随默认分支的 push，打版本 tag 时不会动 latest，
-          # 所以发版流程请保持"先 push master，再 push tag"。
+          # 只在 tag 上构建（见文件顶部 on:），所以 latest 直接无条件跟着版本走。
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
 
       - name: Build and push
         uses: docker/build-push-action@v6
