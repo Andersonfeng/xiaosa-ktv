@@ -128,10 +128,23 @@ docker compose up -d --build
 
 **C. 用 GitHub Actions 自动构建（本机不用装 Docker）**
 
-`.github/workflows/docker-publish.yml` 已经配好：push 到 `main`/`master` 或打 `v1.3.6` 这样的 tag，GitHub 会自动构建 amdp4 镜像，**一次构建同时推两个仓库**：
+`.github/workflows/docker-publish.yml` 已经配好：push 到 `main`/`master` 或打 `v1.3.6` 这样的 tag，GitHub 会自动构建 amd64 镜像，**一次构建同时推两个仓库**：
 
 - **ghcr.io/andersonfeng/xiaosa-ktv** —— 用仓库自带的 `GITHUB_TOKEN`，不需要额外配置
 - **andersonfeng/xiaosa-ktv**（Docker Hub）—— 需要在仓库 Settings → Secrets and variables → Actions 里配 `DOCKERHUB_USERNAME` 和 `DOCKERHUB_TOKEN`（Docker Hub 后台 → Account settings → Security → New access token，勾 Read & Write）；没配时自动只推 GHCR，不会让 CI 变红
+
+产出哪些标签（2026-11 起）：
+
+| 触发方式 | 推上去的标签 |
+|---|---|
+| push 到 `master`（或 `main`） | `latest` |
+| 打 `v1.3.6` 这样的 tag | `1.3.6`、`1.3` |
+
+> 以前还会多推一个 `master` 标签（内容和 `latest` 完全一样），纯噪音，已经从工作流里删掉。
+> 已经推到仓库里的旧 `master` 标签不会自己消失：
+> Docker Hub 在网页 Tags 页单独删掉 `master` 即可（不影响 `latest`）；
+> ghcr.io 的标签是挂在"镜像版本"上的，`master` 和当时的 `latest` 是同一个版本，
+> 所以先发一次新版本让 `latest` 移到新版本，再回头删那个旧版本更稳。
 
 推上去之后，目标机器（只要 `docker-compose.release.yml` + `.env`）：
 
