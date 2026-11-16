@@ -797,9 +797,9 @@ html[data-theme="3"][data-layout="tv"] #s3-stage{display:flex}
    额外的常驻描边，所以这里去掉了 .s3-active 的 box-shadow，只保留基础阴影，
    描边完全跟随真实的键盘/遥控器焦点。 */
 .s3-card.s3-active{box-shadow:0 24px 60px rgba(0,0,0,.55)}
-/* 1.3.5：描边从 3px 加粗到 6px，和通用焦点框统一——轮播卡是风格三下的主
+/* 1.3.5：描边从 3px 加粗到 8px，和通用焦点框统一——轮播卡是风格三下的主
    交互区，3px 在 3 米外太细，老人看不出选中的是哪一张。 */
-.s3-card[data-f].focused{box-shadow:0 0 0 6px #fff,0 24px 60px rgba(0,0,0,.55)}
+.s3-card[data-f].focused{box-shadow:0 0 0 8px #fff,0 24px 60px rgba(0,0,0,.55)}
 /* 下方：暂停/原伴唱/重唱/切歌/音量- —— 居中小MV预览窗 —— 音量+/均衡器/设置/扫码/已点。
    整条按钮栏要占满下方整行宽度、不要边框/背景色块(区别于其它风格里的 .mvbtn
    默认样式)，左右两组各自 flex:1 平分空间，组内每个按钮也 flex:1，这样不管
@@ -1640,10 +1640,10 @@ html[data-layout="tv"] #pl-newest{
 .pc[data-f].focused,.pc:hover{background:rgba(54,217,247,.3);color:var(--ac2);transform:scale(1.15)}
 /* 通用兜底：没有专门写聚焦样式的 data-f 元素，一律用"颜色+放大+白色描边"表现。
    1.3.5：遥控器选中原来只有 scale(1.08) 和一点点变色，3 米外（尤其老人）
-   几乎看不出焦点停在哪。现在统补一圈 6px 白色描边。
+   几乎看不出焦点停在哪。现在统补一圈 8px 白色描边。
    必须用 inset 描边而不是外描边：歌曲行在 .song-list(overflow:auto) 里、
    首页四张大卡片自己有 overflow:hidden，外描边会被裁掉半圈，inset 永远完整。 */
-[data-f].focused{background:rgba(54,217,247,.25);transform:scale(1.08);box-shadow:inset 0 0 0 6px #fff}
+[data-f].focused{background:rgba(54,217,247,.25);transform:scale(1.08);box-shadow:inset 0 0 0 8px #fff}
 
 /* ============================================================
    响应式：竖屏(手机)/横屏(电视)布局切换

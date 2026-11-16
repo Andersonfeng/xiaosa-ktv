@@ -593,10 +593,10 @@ html,body{width:100%;height:100%;width:100vw;height:100vh;overflow:hidden;backgr
 .pc[data-f].focused,.pc:hover{background:rgba(54,217,247,.3);color:var(--ac2);transform:scale(1.15)}
 /* 通用兜底：没有专门写聚焦样式的 data-f 元素，一律用"颜色+放大+白色描边"表现。
    1.3.5：遥控器选中原来只有 scale(1.08) 和一点点变色，3 米外（尤其老人）
-   几乎看不出焦点停在哪。现在统补一圈 6px 白色描边。
+   几乎看不出焦点停在哪。现在统补一圈 8px 白色描边。
    必须用 inset 描边而不是外描边：歌曲行在 .song-list(overflow:auto) 里、
    首页四张大卡片自己有 overflow:hidden，外描边会被裁掉半圈，inset 永远完整。 */
-[data-f].focused{background:rgba(54,217,247,.25);transform:scale(1.08);box-shadow:inset 0 0 0 6px #fff}
+[data-f].focused{background:rgba(54,217,247,.25);transform:scale(1.08);box-shadow:inset 0 0 0 8px #fff}
 
 /* ============================================================
    响应式：竖屏(手机)/横屏(电视)布局切换
