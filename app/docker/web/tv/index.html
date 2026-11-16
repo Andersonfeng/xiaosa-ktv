@@ -804,8 +804,11 @@ html[data-theme="2"] #home.home-hide{opacity:0;pointer-events:none;transition:op
    给下面的 #grid/#s3-stage 让出这部分空间，避免被横幅盖住。 */
 #next-up-bar{position:fixed;top:var(--topbar-h,64px);left:0;right:0;z-index:62;
   height:40px;overflow:hidden;pointer-events:none;
-  background:linear-gradient(90deg,rgba(199,54,247,.32),rgba(54,217,247,.16));
-  border-bottom:1px solid rgba(255,255,255,.1);backdrop-filter:blur(6px);
+  /* 1.3.6：整条背景改成全透明。原来这里有一层"紫→青"的半透明渐变 + 6px 毛玻璃，
+     主界面还不明显，一到全屏播放就变成一条发光的带子横在 MV 画面上，很挡视线。
+     去掉底色、下边框和毛玻璃之后，只剩滚动的文字浮在上面，可读性交给下面的
+     text-shadow（比原来那层 40% 黑的阴影更实一点，压得住亮背景）。 */
+  background:transparent;border-bottom:0;
   opacity:1;transition:opacity .3s ease}
 /* 需求(全屏改为间歇展示 / 主界面开菜单时隐藏)：两种"隐藏"场景各自一个类，
    互不干扰——fs-hidden 由 enterFullscreen()/showFsBannerOnce() 控制(全屏下
@@ -816,7 +819,7 @@ html[data-theme="2"] #home.home-hide{opacity:0;pointer-events:none;transition:op
 #next-up-spacer{flex-shrink:0;height:40px}
 #next-up-track{height:100%;display:flex;align-items:center;white-space:nowrap}
 #next-up-track span{display:inline-block;padding-left:100%;font-size:20px;font-weight:600;
-  color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.4);
+  color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.8),0 0 2px rgba(0,0,0,.6);
   animation-name:nextUpScroll;animation-timing-function:linear;animation-iteration-count:1}
 @keyframes nextUpScroll{from{transform:translateX(0)}to{transform:translateX(-100%)}}
 /* 手机竖屏：横幅/占位高度、字号跟着整体UI比例一起缩小，避免在窄屏上显得

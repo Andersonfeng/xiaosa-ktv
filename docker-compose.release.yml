@@ -6,11 +6,11 @@
 #   docker compose -f docker-compose.release.yml up -d
 #
 # 换镜像：在 .env 里设置 KTV_IMAGE=你的仓库/镜像:tag，或不改文件直接
-#   KTV_IMAGE=andersonfeng/xiaosa-ktv:1.3.5 docker compose -f docker-compose.release.yml up -d
+#   KTV_IMAGE=andersonfeng/xiaosa-ktv:1.3.6 docker compose -f docker-compose.release.yml up -d
 
 services:
   xiaosa-ktv:
-    image: ${KTV_IMAGE:-andersonfeng/xiaosa-ktv:1.3.5}
+    image: ${KTV_IMAGE:-andersonfeng/xiaosa-ktv:1.3.6}
     container_name: xiaosa-ktv
     restart: unless-stopped
     ports:
